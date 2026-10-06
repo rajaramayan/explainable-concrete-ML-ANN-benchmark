@@ -113,9 +113,12 @@ def _chart(fig, height=None):
     if height:
         fig.update_layout(height=height)
     try:
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     except Exception:
-        st.plotly_chart(fig)
+        try:
+            st.plotly_chart(fig, use_container_width=True)
+        except Exception:
+            st.plotly_chart(fig)
 
 
 def _df(df_in, **kw):
