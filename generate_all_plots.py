@@ -129,9 +129,17 @@ ax.set_xlim(min_val, max_val)
 ax.set_ylim(min_val, max_val)
 ax.legend(frameon=True, loc="upper left")
 
-# Annotation text for R2 and RMSE
-ax.text(0.65, 0.10, "$R^2 = 0.9018$\n$\mathrm{RMSE} = 5.03\mathrm{~MPa}$\n$\mathrm{MAE} = 3.46\mathrm{~MPa}$", 
-        transform=ax.transAxes, bbox=dict(boxstyle="round,pad=0.5", facecolor="#f8f9fa", edgecolor="#dadce0"))
+# Annotation text — dynamically derived from model_comparison.csv (Hybrid row)
+hybrid_row = comp_df[comp_df["Model"].str.contains("Hybrid", case=False, na=False)].iloc[0]
+hybrid_r2   = hybrid_row["R2"]
+hybrid_rmse = hybrid_row["RMSE"]
+hybrid_mae  = hybrid_row["MAE"]
+ax.text(0.65, 0.10,
+        f"$R^2 = {hybrid_r2:.4f}$\n"
+        f"$\\mathrm{{RMSE}} = {hybrid_rmse:.2f}\\mathrm{{~MPa}}$\n"
+        f"$\\mathrm{{MAE}} = {hybrid_mae:.2f}\\mathrm{{~MPa}}$",
+        transform=ax.transAxes,
+        bbox=dict(boxstyle="round,pad=0.5", facecolor="#f8f9fa", edgecolor="#dadce0"))
 
 plt.tight_layout()
 plt.savefig(save_path("actual_vs_predicted.png"), dpi=300, bbox_inches="tight")

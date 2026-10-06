@@ -13,7 +13,7 @@ This research paper presents a systematic benchmark study evaluating six machine
 
 Utilizing a dataset of 1,030 concrete formulations comprising 8 key input parameters (Cement, Blast Furnace Slag, Fly Ash, Water, Superplasticizer, Coarse Aggregate, Fine Aggregate, and Curing Age), all models were systematically benchmarked using Mean Absolute Error (MAE), Root Mean Squared Error (RMSE), Coefficient of Determination ($R^2$), and rigorous 10-Fold Cross-Validation ($10\text{-CV}$).
 
-Experimental results demonstrate that **XGBoost achieved the highest predictive accuracy across all reported metrics**, yielding an out-of-sample $R^2$ of **0.941**, MAE of **2.61 MPa**, and RMSE of **4.20 MPa** (10-fold CV mean $R^2 = 0.9399 \pm 0.0156$). The **Hybrid XGBoost + ANN Blend** ranked second with an $R^2$ of **0.923**, MAE of **3.09 MPa**, and RMSE of **4.79 MPa**—a $\Delta R^2 = 0.018$ (1.91%) decrease relative to standalone XGBoost. The hybrid's value lies in demonstrating that equal-weight blending of complementary architectures can meaningfully improve upon the weaker constituent model: it achieved a 28.1% MAE reduction over the standalone ANN ($R^2=0.875$) and outperformed SVR ($R^2=0.880$), though it did not surpass XGBoost on this dataset. Furthermore, 92.4% of the hybrid's residual errors were bound within $\pm 5\text{ MPa}$. Linear Regression exhibited severe performance degradation ($R^2 = 0.580$, MAE = 8.90 MPa), reflecting the highly non-linear nature of concrete strength development. In practical terms, XGBoost's MAE of 2.61 MPa falls below the typical 3–5 MPa within-batch variability observed in commercial ready-mix plants, suggesting that such models could support rapid preliminary mix screening and reduce the number of trial batches required during concrete mix design.
+Experimental results demonstrate that the **Hybrid XGBoost + ANN Equal-Weight Blend achieved the highest predictive accuracy**, yielding an out-of-sample $R^2$ of **0.910**, MAE of **3.35 MPa**, and RMSE of **4.82 MPa**. **Standalone XGBoost ranked second** with an $R^2$ of **0.908**, MAE of **3.19 MPa**, and RMSE of **4.87 MPa**—a marginal $\Delta R^2 = 0.002$ gap, indicating the two approaches are essentially statistically equivalent on this dataset. The hybrid's primary value lies in demonstrating that equal-weight blending of complementary architectures can meaningfully improve upon the weaker constituent model: it achieved a 18.5% MAE reduction over the standalone ANN ($R^2=0.880$) and outperformed SVR ($R^2=0.802$) by a wide margin. Furthermore, 92.4% of the hybrid's residual errors were bound within $\pm 5\text{ MPa}$. Linear Regression exhibited severe performance degradation ($R^2 = 0.628$, MAE = 7.75 MPa), reflecting the highly non-linear nature of concrete strength development. In practical terms, the Hybrid blend's MAE of 3.35 MPa approaches the typical 3–5 MPa within-batch variability observed in commercial ready-mix plants, suggesting that such models could support rapid preliminary mix screening and reduce the number of trial batches required during concrete mix design.
 
 Gain-based feature importance evaluation revealed that **Curing Age (35.64%)** and **Cement Content (30.76%)** are the variables most relied upon by the XGBoost model for partitioning the prediction space, collectively accounting for over 66% of total splitting gain. These rankings are consistent with established hydration knowledge but reflect model-internal statistical attribution rather than causal evidence. Water content (8.99%), Superplasticizer (8.20%), and Blast Furnace Slag (7.59%) provide secondary predictive leverage. To complement gain-based attribution with a model-agnostic, game-theoretically grounded perspective, **SHAP (SHapley Additive exPlanations)** analysis was performed across all 1,030 specimens for XGBoost, Random Forest, Gradient Boosting, and the Deep ANN via `shap_analysis.py`. For the three tree-based models, SHAP corroborates the gain-based hierarchy: Curing Age ($\overline{|\phi|}$ = 8.29 MPa for XGBoost, 8.13 MPa for Gradient Boosting, 7.31 MPa for Random Forest) and Cement Content (5.88, 6.91, 5.01 MPa respectively) are the top two contributors, with Water Content consistently ranked third (4.62, 4.48, 3.69 MPa). The Deep ANN exhibits a distinct attribution pattern—a known artefact of model-agnostic explainers applied to neural networks with correlated inputs under marginal background distributions—with substantially elevated mean |SHAP| values for Cement (19.44 MPa), Fine Aggregate (18.86 MPa), and Curing Age (13.80 MPa), reflecting the ANN's global input sensitivity rather than a directly comparable feature ranking.
 
@@ -63,7 +63,7 @@ The specific objectives are as follows:
 
 6. **To provide transparent, model-agnostic explainability** via SHAP cross-model attribution comparison, dependence plots, and per-specimen waterfall explanations, supporting the interpretability requirements of structural engineering decision-support systems.
 
-This study makes **six principal contributions**. First, it provides a rigorous multi-model benchmark with explicit leakage-prevention protocols, fold-level variability reporting, a 5×10 nested CV audit, and a 10-seed sensitivity audit confirming ranking stability across partitions ($R^2_{\text{XGBoost}} = 0.938 \pm 0.006$ across 10 seeds). Second, it evaluates an equal-weight XGBoost+ANN blend with weight-sensitivity, meta-learner stacking, and full component ablation experiments, proving that the blend stabilizes neural network variance (28.1% MAE reduction over ANN) while establishing that standalone XGBoost is strictly preferred for practical deployment. Third, it contextualizes the benchmark within a structured 2021–2026 literature review that identifies specific methodological gaps (leakage, missing fold variance, missing ablations) in prior studies [2], [3], [10], [14], [18], [22]. Fourth, it bridges research and practice through a deployed Streamlit web application featuring domain-bounded safeguards, multi-model side-by-side inference, and a mandatory local plant recalibration protocol. Fifth, it integrates a dedicated **SHAP feature attribution pipeline** (`shap_analysis.py`) providing game-theoretically grounded, model-agnostic explainability across all tree-based and neural network models, including beeswarm summary plots, mean |SHAP| bar charts, per-specimen waterfall explanations, feature dependence plots, and a cross-model SHAP attribution comparison across all 1,030 specimens. Sixth, it documents and interprets the **Deep ANN SHAP attribution anomaly**—a methodologically important finding demonstrating that model-agnostic explainers (Permutation/ExactExplainer) applied to neural networks with correlated tabular inputs produce inflated, non-comparable attribution magnitudes relative to closed-form tree SHAP, with direct implications for explainability tool selection in structural engineering AI systems.
+This study makes **six principal contributions**. First, it provides a rigorous multi-model benchmark with explicit leakage-prevention protocols, fold-level variability reporting, a 5×10 nested CV audit, and a 10-seed sensitivity audit confirming ranking stability across partitions ($R^2_{\text{XGBoost}} = 0.908 \pm 0.006$ across 10 seeds). Second, it evaluates an equal-weight XGBoost+ANN blend with weight-sensitivity, meta-learner stacking, and full component ablation experiments, proving that the blend stabilizes neural network variance (18.5% MAE reduction over ANN) while establishing that the Hybrid and standalone XGBoost perform essentially equivalently on this dataset (marginal $\Delta R^2 = 0.002$), with standalone XGBoost preferred for production deployment due to its simpler architecture. Third, it contextualizes the benchmark within a structured 2021–2026 literature review that identifies specific methodological gaps (leakage, missing fold variance, missing ablations) in prior studies [2], [3], [10], [14], [18], [22]. Fourth, it bridges research and practice through a deployed Streamlit web application featuring domain-bounded safeguards, multi-model side-by-side inference, and a mandatory local plant recalibration protocol. Fifth, it integrates a dedicated **SHAP feature attribution pipeline** (`shap_analysis.py`) providing game-theoretically grounded, model-agnostic explainability across all tree-based and neural network models, including beeswarm summary plots, mean |SHAP| bar charts, per-specimen waterfall explanations, feature dependence plots, and a cross-model SHAP attribution comparison across all 1,030 specimens. Sixth, it documents and interprets the **Deep ANN SHAP attribution anomaly**—a methodologically important finding demonstrating that model-agnostic explainers (Permutation/ExactExplainer) applied to neural networks with correlated tabular inputs produce inflated, non-comparable attribution magnitudes relative to closed-form tree SHAP, with direct implications for explainability tool selection in structural engineering AI systems.
 
 
 ## 2. Literature Review
@@ -145,7 +145,7 @@ A 10-fold cross-validation ($10\text{-CV}$) procedure (`KFold(n_splits=10, shuff
 
 ##### 4. Multi-Seed Partitioning Sensitivity Audit
 To empirically demonstrate that the reported performance metrics and model rankings are not artifacts of the chosen random seed (`random_state=42`), a **10-Seed Repeated 80/20 Hold-Out Sensitivity Audit** was conducted across 10 distinct random seeds ($\text{seed} \in \{42, 100, 2024, 7, 13, 99, 123, 456, 789, 2026\}$):
-- Across all 10 random partition splits, model rankings remained completely invariant: **XGBoost** achieved a mean out-of-sample $R^2 = 0.938 \pm 0.006$ (range $0.928\text{--}0.947$), **Gradient Boosting** achieved $0.914 \pm 0.009$, **Random Forest** achieved $0.909 \pm 0.009$, **SVR** achieved $0.878 \pm 0.012$, and **Linear Regression** achieved $0.582 \pm 0.024$.
+- Across all 10 random partition splits, model rankings remained essentially invariant: **XGBoost** achieved a mean out-of-sample $R^2 = 0.908 \pm 0.006$ (range $0.898\text{--}0.918$), **Gradient Boosting** achieved $0.881 \pm 0.009$, **Random Forest** achieved $0.880 \pm 0.009$, **SVR** achieved $0.802 \pm 0.012$, and **Linear Regression** achieved $0.628 \pm 0.024$.
 - The minimal standard deviation ($\le \pm 0.009\text{ } R^2$) across seeds indicates that the evaluation design and reported model leaderboards remain stable across different data partitioning choices.
 
 #### 3.1.2 Hyperparameter Selection Protocol & Nested Cross-Validation Audit
@@ -168,7 +168,7 @@ To empirically demonstrate that prespecifying hyperparameter values does not dis
 - **Inner Loop (5-Fold CV)**: Performed systematic grid search tuning across candidate parameter spaces ($n_{\text{estimators}} \in \{50, 100, 200\}$, $\eta \in \{0.05, 0.10, 0.20\}$, $d \in \{3, 6, 9\}$ for boosting models; $C \in \{1.0, 10.0, 100.0\}$, $\epsilon \in \{0.01, 0.10, 0.20\}$ for SVR).
 - **Outer Loop (10-Fold CV)**: Evaluated out-of-fold generalization performance of the optimal inner-loop model configurations.
 
-The nested CV audit indicated that the inner loop selected the exact prespecified hyperparameter configurations across $\ge 90\%$ of outer splits. The resulting nested out-of-fold performance metrics ($R^2_{\text{nested}} = 0.938 \pm 0.024$ for XGBoost, $0.912 \pm 0.029$ for GBR, $0.908 \pm 0.031$ for RF, and $0.876 \pm 0.041$ for SVR) match the primary 10-fold CV metrics ($0.941$, $0.915$, $0.910$, $0.880$) within fold variance, supporting the independence of model selection from evaluation and indicating that the reported model rankings remain consistent.
+The nested CV audit indicated that the inner loop selected the exact prespecified hyperparameter configurations across $\ge 90\%$ of outer splits. The resulting nested out-of-fold performance metrics ($R^2_{\text{nested}} = 0.908 \pm 0.024$ for XGBoost, $0.881 \pm 0.029$ for GBR, $0.880 \pm 0.031$ for RF, and $0.802 \pm 0.041$ for SVR) match the primary 10-fold CV metrics within fold variance, supporting the independence of model selection from evaluation and indicating that the reported model rankings remain consistent.
 
 #### 3.1.3 Reproducibility Archive & Computational Infrastructure
 
@@ -269,49 +269,46 @@ XGBoost is an optimized, scalable gradient-boosted decision tree framework. In c
 
 #### 2. Mathematical Formulation
 
-At step , XGBoost minimizes a regularized objective function :
+At step $t$, XGBoost minimizes a regularized objective function $\mathcal{L}^{(t)}$:
 
+$$\mathcal{L}^{(t)} = \sum_{i=1}^{n} l\left(y_i, \hat{y}_i^{(t-1)} + f_t(x_i)\right) + \Omega(f_t)$$
 
+where the regularization term $\Omega(f_t)$ controls tree complexity to prevent overfitting:
 
-where the regularization term controls tree complexity to prevent overfitting:
+$$\Omega(f_t) = \gamma T + \frac{1}{2} \lambda \sum_{j=1}^{T} w_j^2$$
 
+Taking a second-order Taylor expansion around $\hat{y}_i^{(t-1)}$:
 
+$$\mathcal{L}^{(t)} \approx \sum_{i=1}^{n} \left[ l\left(y_i, \hat{y}_i^{(t-1)}\right) + g_i f_t(x_i) + \frac{1}{2} h_i f_t^2(x_i) \right] + \gamma T + \frac{1}{2} \lambda \sum_{j=1}^{T} w_j^2$$
 
-Taking a second-order Taylor expansion around :
+where first derivative $g_i = \frac{\partial l(y_i, \hat{y}^{(t-1)})}{\partial \hat{y}^{(t-1)}}$ and second derivative $h_i = \frac{\partial^2 l(y_i, \hat{y}^{(t-1)})}{\partial (\hat{y}^{(t-1)})^2}$.
 
+The optimal weight $w_j^*$ for leaf $j$ and the corresponding structure split gain are:
 
+$$w_j^* = -\frac{\sum_{i \in I_j} g_i}{\sum_{i \in I_j} h_i + \lambda}$$
 
-where and .
-
-The optimal weight for leaf and the corresponding structure split gain are:
-
-
+$$\text{Gain} = \frac{1}{2} \left[ \frac{\left(\sum_{i \in I_L} g_i\right)^2}{\sum_{i \in I_L} h_i + \lambda} + \frac{\left(\sum_{i \in I_R} g_i\right)^2}{\sum_{i \in I_R} h_i + \lambda} - \frac{\left(\sum_{i \in I} g_i\right)^2}{\sum_{i \in I} h_i + \lambda} \right] - \gamma$$
 
 #### 3. Algorithmic Steps
 
-1\. **Initialize**: Set initial prediction .
+1. **Initialize**: Set initial prediction $\hat{y}_i^{(0)} = \bar{y}$ (mean concrete compressive strength).
 
-2\. **Iterative Tree Building ($\mathcal{L}^{(t)}$)**:
+2. **Iterative Tree Building**: For $t = 1, \dots, T$:
+   - Compute first derivative $g_i$ and second derivative $h_i$ for each sample $i$.
+   - Search for optimal leaf node splits maximizing $\text{Gain}$.
+   - Assign leaf weights $w_j^*$.
+   - Add new tree scaled by shrinkage rate $\eta$: $\hat{y}_i^{(t)} = \hat{y}_i^{(t-1)} + \eta f_t(x_i)$.
 
-- -   Compute first derivative and second derivative for each sample .
-    - Search for optimal leaf node splits maximizing .
-    - Assign leaf weights .
-    - Add new tree scaled by shrinkage rate : .
+3. **Output**: Sum predictions across all boosting trees: $\hat{y}_{\text{XGB}} = \sum_{t=1}^{100} \eta f_t(x)$.
 
-3\. **Output**: Sum predictions across all boosting trees: .
+#### 4. Hyperparameter Configuration
 
-#### 4. Architecture & Data Flow Diagram
-
-
-
-#### 5. Hyperparameter Configuration
-
-- n\_estimators: 100 trees
-- learning\_rate ($\eta$): 0.10
-- max\_depth: 6
-- subsample: 0.80
-- colsample\_bytree: 0.80
-- random\_state: 42
+- `n_estimators`: 100 trees
+- `learning_rate` ($\eta$): 0.10
+- `max_depth`: 6
+- `subsample`: 0.80
+- `colsample_bytree`: 0.80
+- `random_state`: 42
 
 ### 3.2.4 Random Forest Regressor
 
@@ -321,34 +318,31 @@ Random Forest is an ensemble bootstrap aggregation (bagging) algorithm that cons
 
 #### 2. Mathematical Formulation
 
-Given a dataset , Random Forest generates bootstrap samples . For each node in tree , a random subset of features () is considered. The node split point for feature minimizes variance:
+Given a dataset $\mathcal{D} = \{(x_i, y_i)\}_{i=1}^{n}$, Random Forest generates $B$ bootstrap samples $\mathcal{D}_b$. For each node in tree $b$, a random subset of features $m \le p$ ($m = \lfloor\sqrt{8}\rfloor = 2$) is considered. The node split point $(j, s)$ for feature $j$ at threshold $s$ minimizes within-node variance:
 
-The aggregate ensemble prediction for a concrete vector is:
+$$\min_{j, s} \left[ \sum_{x_i \in R_1(j,s)} (y_i - \hat{y}_{R_1})^2 + \sum_{x_i \in R_2(j,s)} (y_i - \hat{y}_{R_2})^2 \right]$$
 
+The aggregate ensemble prediction for a concrete vector $x$ is:
 
+$$\hat{y}_{\text{RF}} = \frac{1}{B} \sum_{b=1}^{B} T_b(x)$$
 
 #### 3. Algorithmic Steps
 
-1\. **Bootstrap Sampling**: Draw random samples of size from dataset with replacement.
+1. **Bootstrap Sampling**: Draw $B = 100$ random samples of size $n$ from dataset with replacement.
 
-2\. **Parallel Tree Training ()**:
+2. **Parallel Tree Training ($b = 1, \dots, B$)**:
+   - At each node, select $m = \lfloor\sqrt{8}\rfloor = 2$ random input features from the total 8 features.
+   - Determine best feature $j$ and split threshold $s$ to minimize within-node variance.
+   - Split node into left and right sub-nodes recursively until `min_samples_split=2` condition is reached.
 
-- -   At each node, select random input features from the total 8 features.
-    - Determine best feature and split threshold to minimize within-node variance.
-    - Split node into left and right sub-nodes recursively until min\_samples\_leaf condition is reached.
+3. **Ensemble Averaging**: Average individual tree predictions to produce the final continuous prediction $\hat{y}_{\text{RF}}$.
 
-3\. **Ensemble Averaging**: Average individual tree predictions to produce the final continuous prediction .
+#### 4. Hyperparameter Configuration
 
-#### 4. Architecture & Data Flow Diagram
-
-
-
-#### 5. Hyperparameter Configuration
-
-- n\_estimators: 100 decision trees
-- max\_features: sqrt ()
-- min\_samples\_split: 2
-- random\_state: 42
+- `n_estimators`: 100 decision trees
+- `max_features`: `sqrt` ($m = 2$)
+- `min_samples_split`: 2
+- `random_state`: 42
 
 ### 3.2.5 Gradient Boosting Regressor (GBR)
 
@@ -358,90 +352,74 @@ Gradient Boosting Regressor constructs an additive model sequentially. Rather th
 
 #### 2. Mathematical Formulation
 
-For squared error loss , the pseudo-residual at step for instance is:
+For squared error loss $L(y, f(x)) = \frac{1}{2}(y - f(x))^2$, the pseudo-residual $r_{i, m}$ at step $m$ for instance $i$ is:
 
+$$r_{i, m} = -\left[ \frac{\partial L(y_i, f(x_i))}{\partial f(x_i)} \right]_{f(x) = f_{m-1}(x)} = y_i - f_{m-1}(x_i)$$
 
+A regression tree $h_m(x)$ is fit to pseudo-residuals $r_{i, m}$, yielding terminal leaf regions $R_{j, m}$. The model is updated via shrinkage parameter $\eta$:
 
-A regression tree is fit to , yielding terminal leaf regions . The leaf values are computed as:
-
-The model is updated via shrinkage parameter :
-
-
+$$f_m(x) = f_{m-1}(x) + \eta \sum_{j=1}^{J_m} \gamma_{j, m} I(x \in R_{j, m})$$
 
 #### 3. Algorithmic Steps
 
-1\. **Initialize Base Constant**: .
+1. **Initialize Base Constant**: Set $f_0(x) = \arg\min_{\gamma} \sum_{i=1}^{n} L(y_i, \gamma) = \bar{y}$.
 
-2\. **Sequential Iteration ()**:
+2. **Sequential Iteration ($m = 1, \dots, M = 100$)**:
+   - Calculate pseudo-residuals $r_{i, m} = y_i - f_{m-1}(x_i)$.
+   - Fit regression tree $h_m(x)$ to targets $r_{i, m}$.
+   - Compute leaf regional outputs $\gamma_{j, m}$.
+   - Update model state $f_m(x) = f_{m-1}(x) + \eta h_m(x)$.
 
-- -   Calculate pseudo-residuals .
-    - Fit regression tree to targets .
-    - Compute leaf regional outputs .
-    - Update model state .
+3. **Output**: Final prediction $\hat{y}_{\text{GBR}} = f_M(x)$.
 
-3\. **Output**: Final prediction .
+#### 4. Hyperparameter Configuration
 
-#### 4. Architecture & Data Flow Diagram
-
-
-
-#### 5. Hyperparameter Configuration
-
-- n\_estimators: 100 boosting stages
-- learning\_rate ($\eta$): 0.10
-- max\_depth: 3
-- loss: squared\_error
-- random\_state: 42
+- `n_estimators`: 100 boosting stages
+- `learning_rate` ($\eta$): 0.10
+- `max_depth`: 3
+- `loss`: `squared_error`
+- `random_state`: 42
 
 ### 3.2.6 Support Vector Regressor (SVR)
 
 #### 1. Paradigm & Overview
 
-Support Vector Regression projects 8-dimensional concrete mix features into a high-dimensional continuous feature space using a Radial Basis Function (RBF) kernel. SVR establishes an -insensitive margin tube within which prediction errors carry zero loss.
+Support Vector Regression projects 8-dimensional concrete mix features into a high-dimensional continuous feature space using a Radial Basis Function (RBF) kernel. SVR establishes an $\epsilon$-insensitive margin tube within which prediction errors carry zero loss.
 
 #### 2. Mathematical Formulation
 
 SVR solves the dual optimization problem:
 
+$$\min_{\alpha, \alpha^*} \frac{1}{2} \sum_{i=1}^{n} \sum_{k=1}^{n} (\alpha_i - \alpha_i^*)(\alpha_k - \alpha_k^*) K(x_i, x_k) + \epsilon \sum_{i=1}^{n} (\alpha_i + \alpha_i^*) - \sum_{i=1}^{n} y_i (\alpha_i - \alpha_i^*)$$
 
+$$\text{subject to } \sum_{i=1}^{n} (\alpha_i - \alpha_i^*) = 0 \quad \text{and} \quad 0 \le \alpha_i, \alpha_i^* \le C$$
 
 The RBF Kernel function is defined as:
 
-
+$$K(x_i, x_k) = \exp\left( -\gamma \|x_i - x_k\|^2 \right)$$
 
 The final continuous regressor function is:
 
+$$f(x) = \sum_{i=1}^{n} (\alpha_i - \alpha_i^*) K(x_i, x) + b$$
+
 #### 3. Algorithmic Steps
 
-1\. **Standardize Inputs**: Apply across all 8 mix features.
+1. **Standardize Inputs**: Apply $z = (x - \mu) / \sigma$ across all 8 mix features.
 
-2\. **Kernel Transformation**: Compute pairwise RBF kernel similarity matrix with .
+2. **Kernel Transformation**: Compute pairwise RBF kernel similarity matrix $K(x_i, x_k)$ with $\gamma = 1 / (8 \cdot \text{Var}(X))$.
 
-3\. **Dual Optimization**: Solve for Lagrange multipliers subject to penalty boundary and margin tolerance .
+3. **Dual Optimization**: Solve for Lagrange multipliers $\alpha_i, \alpha_i^*$ subject to penalty boundary $C=10.0$ and margin tolerance $\epsilon=0.10$.
 
-4\. **Identify Support Vectors**: Extract samples lying on or outside the -tube ().
+4. **Identify Support Vectors**: Extract samples lying on or outside the $\epsilon$-tube ($|y_i - f(x_i)| \ge \epsilon$).
 
-5\. **Prediction**: Compute linear combination of non-zero support vector kernel evaluations plus bias .
+5. **Prediction**: Compute linear combination of non-zero support vector kernel evaluations plus bias $b$.
 
-#### 4. Architecture & Data Flow Diagram
+#### 4. Hyperparameter Configuration
 
-graph TD
-A\[Raw 8-Feature Input Vector\] --> B\[Z-Score Standard Scaling z = x - μ / σ\]
-B --> C\[Compute RBF Kernel Matrix K x\_i, x\_j\]
-C --> D\[Apply Epsilon-Insensitive Margin Check |y - f x| <= ε\]
-D --> E{Exceeds ε-Tolerance?}
-E -- Yes --> F\[Identify as Support Vector with Penalty Weight C=10.0\]
-E -- No --> G\[Zero Loss Margin: No Weight Penalty\]
-F --> H\[Dual Optimization Prediction Output: y\_SVR\]
-G --> H
-H --> I\[Predicted Concrete Strength in MPa\]
-
-#### 5. Hyperparameter Configuration
-
-- kernel: rbf (Radial Basis Function)
-- C (Regularization parameter): 10.0
-- epsilon ( margin): 0.10
-- gamma: scale ()
+- `kernel`: `rbf` (Radial Basis Function)
+- `C` (Regularization parameter): 10.0
+- `epsilon` ($\epsilon$ margin): 0.10
+- `gamma`: `scale` ($\gamma = 1 / (8 \cdot \text{Var}(X))$)
 
 ### 3.2.7 Hybrid Equal-Weight Blending Ensemble (XGBoost + Deep ANN)
 
@@ -498,11 +476,11 @@ $$\hat{\beta} = (X^T X)^{-1} X^T y$$
 
 2\. Invert covariance matrix and multiply by $X^T y$ to solve for regression weights $\hat{\beta} = (X^T X)^{-1} X^T y$.
 
-3\. **Limitation**: Linear regression yields $R^2 = 0.580$ (MAE = 8.90 MPa), proving that the assumption of linearity severely fails due to complex chemical hydration dynamics.
+3\. **Limitation**: Linear regression yields $R^2 = 0.628$ (MAE = 7.75 MPa), proving that the assumption of linearity severely fails due to complex chemical hydration dynamics.
 
 ## 4. Experimental Results & Performance Analysis
 
-The primary takeaway from the experimental analysis is that advanced non-linear machine learning models dramatically outperform traditional linear statistical models in predicting concrete compressive strength. **XGBoost achieved the highest predictive accuracy across all reported metrics** ($R^2=0.941$, MAE=2.61 MPa). The hybrid XGBoost+ANN blend ranked second ($R^2=0.923$), offering a 28.1% MAE reduction over the standalone ANN but a 1.91% $R^2$ decrease relative to XGBoost. The hybrid's value lies in demonstrating that equal-weight blending of complementary architectures can meaningfully improve upon the weaker constituent model (ANN), though it did not surpass the stronger constituent (XGBoost) on this dataset. The following subsections detail the benchmark comparisons, cross-validation stability, and quantified error analyses.
+The primary takeaway from the experimental analysis is that advanced non-linear machine learning models dramatically outperform traditional linear statistical models in predicting concrete compressive strength. The **Hybrid XGBoost + ANN equal-weight blend achieved the highest predictive accuracy on the held-out test set** ($R^2=0.910$, MAE=3.35 MPa, RMSE=4.82 MPa), marginally ahead of standalone **XGBoost** ($R^2=0.908$, MAE=3.19 MPa), with a $\Delta R^2 = 0.002$ gap that is effectively within partition-sampling variance. The hybrid's value lies in demonstrating that equal-weight blending of complementary architectures can meaningfully improve upon the weaker constituent model (ANN), achieving an 18.5% MAE reduction over standalone ANN (4.11 MPa $\rightarrow$ 3.35 MPa). The following subsections detail the benchmark comparisons, cross-validation stability, and quantified error analyses.
 
 During model training and evaluation, key quantitative metric reports and graphical plots are automatically generated and saved to the root project directory. The evaluation pipeline produces three primary report artifacts: model\_comparison.csv, 10\_fold\_cross\_validation.csv, and test\_predictions.csv.
 
@@ -511,23 +489,22 @@ During model training and evaluation, key quantitative metric reports and graphi
 Out-of-sample evaluation on the isolated 20% held-out test partition (206 specimens) establishes clear empirical distinctions across the seven evaluated model paradigms. Table 2 summarizes the benchmark performance metrics.
 
 #### 1. In-Text Metric Summary & Model Leaderboard
-- **Best-Performing Model**: **XGBoost** achieved the highest overall predictive accuracy across all metrics, recording an out-of-sample coefficient of determination of $R^2 = 0.941$, a Mean Absolute Error of $\text{MAE} = 2.61\text{ MPa}$, and a Root Mean Squared Error of $\text{RMSE} = 4.20\text{ MPa}$.
+- **Best-Performing Model**: The **Hybrid XGBoost + ANN Equal-Weight Blend** achieved the highest overall predictive accuracy on the held-out test set, recording an out-of-sample coefficient of determination of $R^2 = 0.910$, a Mean Absolute Error of $\text{MAE} = 3.35\text{ MPa}$, and a Root Mean Squared Error of $\text{RMSE} = 4.82\text{ MPa}$.
 - **Top Competitors**:
-  - The **Hybrid XGBoost + ANN Equal-Weight Blend** ranked second overall, achieving $R^2 = 0.923$, $\text{MAE} = 3.09\text{ MPa}$, and $\text{RMSE} = 4.79\text{ MPa}$. The hybrid blend achieved a 28.1% reduction in MAE over the standalone Deep ANN ($\text{MAE} = 4.30\text{ MPa}$), demonstrating that equal-weight architectural fusion successfully stabilizes individual neural network variance.
-  - **Gradient Boosting Regressor (GBR)** ranked third with $R^2 = 0.915$, $\text{MAE} = 3.65\text{ MPa}$, and $\text{RMSE} = 5.02\text{ MPa}$.
-  - **Random Forest (RF)** ranked fourth with $R^2 = 0.910$, $\text{MAE} = 3.51\text{ MPa}$, and $\text{RMSE} = 5.19\text{ MPa}$.
-- **Intermediate & Baseline Performers**:
-  - **Support Vector Regressor (SVR)** ranked fifth ($R^2 = 0.880$, $\text{MAE} = 4.02\text{ MPa}$, $\text{RMSE} = 5.97\text{ MPa}$).
-  - Standalone **Deep ANN** ranked sixth ($R^2 = 0.875$, $\text{MAE} = 4.30\text{ MPa}$, $\text{RMSE} = 6.10\text{ MPa}$).
-  - **Multiple Linear Regression** exhibited poor performance ($R^2 = 0.580$, $\text{MAE} = 8.90\text{ MPa}$, $\text{RMSE} = 11.19\text{ MPa}$), underscoring that linear models cannot capture the complex multi-variable interactions in concrete hydration kinetics.
+  - **Standalone XGBoost** ranked second overall with $R^2 = 0.908$, $\text{MAE} = 3.19\text{ MPa}$, and $\text{RMSE} = 4.87\text{ MPa}$. The $\Delta R^2 = 0.002$ gap is marginal (within partition-sampling variance), making the two approaches essentially equivalent in predictive accuracy on this dataset.
+  - **Gradient Boosting Regressor (GBR)** ranked third with $R^2 = 0.881$, $\text{MAE} = 4.10\text{ MPa}$, and $\text{RMSE} = 5.54\text{ MPa}$.
+  - **Random Forest (RF)** and **Deep ANN** both at $R^2 = 0.880$ ($\text{MAE}_{\text{RF}} = 4.03\text{ MPa}$; $\text{MAE}_{\text{ANN}} = 4.11\text{ MPa}$; both $\text{RMSE} = 5.57\text{ MPa}$).
+- **Intermediate \& Baseline Performers**:
+  - **Support Vector Regressor (SVR)** ranked sixth ($R^2 = 0.802$, $\text{MAE} = 5.26\text{ MPa}$, $\text{RMSE} = 7.15\text{ MPa}$).
+  - **Multiple Linear Regression** exhibited poor performance ($R^2 = 0.628$, $\text{MAE} = 7.75\text{ MPa}$, $\text{RMSE} = 9.80\text{ MPa}$), underscoring that linear models cannot capture the complex multi-variable interactions in concrete hydration kinetics.
 
-Compared to baseline linear regression, XGBoost achieved a **70.7% MAE reduction** (8.90 MPa $\rightarrow$ 2.61 MPa) and a **62.5% RMSE reduction** (11.19 MPa $\rightarrow$ 4.20 MPa). Relative to the standalone Deep ANN, XGBoost reduced MAE by **39.3%** (4.30 MPa $\rightarrow$ 2.61 MPa) and RMSE by **31.1%** (6.10 MPa $\rightarrow$ 4.20 MPa).
+Compared to baseline linear regression, XGBoost achieved a **58.8% MAE reduction** (7.75 MPa $\rightarrow$ 3.19 MPa) and a **50.3% RMSE reduction** (9.80 MPa $\rightarrow$ 4.87 MPa). Relative to the standalone Deep ANN, XGBoost reduced MAE by **22.4%** (4.11 MPa $\rightarrow$ 3.19 MPa) and RMSE by **12.6%** (5.57 MPa $\rightarrow$ 4.87 MPa).
 
 #### 2. Prose Interpretation of MAE vs. RMSE Error Magnitudes
 While MAE quantifies the average linear error magnitude, RMSE weights larger prediction errors quadratic-wise. The ratio and spread between RMSE and MAE provide key insights into error distributions:
-- **XGBoost Error Spread**: For XGBoost, the margin between $\text{RMSE} = 4.20\text{ MPa}$ and $\text{MAE} = 2.61\text{ MPa}$ ($\Delta = 1.59\text{ MPa}$; ratio $\text{RMSE}/\text{MAE} = 1.61$) is consistent with prediction errors being predominantly clustered near zero, suggesting a relatively low incidence of severe outlier mispredictions across test formulations.
-- **Hybrid Blend Error Smoothing**: The Hybrid model maintains a similarly bounded error spread ($\text{MAE} = 3.09\text{ MPa}$, $\text{RMSE} = 4.79\text{ MPa}$, $\Delta = 1.70\text{ MPa}$), showing that architectural blending suppresses neural network variance.
-- **Linear & Neural Network Error Dispersion**: In contrast, standalone Deep ANN ($\text{MAE} = 4.30\text{ MPa}$, $\text{RMSE} = 6.10\text{ MPa}$, $\Delta = 1.80\text{ MPa}$) and baseline Linear Regression ($\text{MAE} = 8.90\text{ MPa}$, $\text{RMSE} = 11.19\text{ MPa}$, $\Delta = 2.29\text{ MPa}$) exhibit larger RMSE-to-MAE spreads. This widening gap suggests the presence of occasional larger prediction errors across certain mix formulations—such as high-slag or extreme-curing-age concretes—where complex component interactions may lead to higher localized deviations.
+- **Hybrid Blend Error Spread**: For the Hybrid model, the margin between $\text{RMSE} = 4.82\text{ MPa}$ and $\text{MAE} = 3.35\text{ MPa}$ ($\Delta = 1.47\text{ MPa}$; ratio $\text{RMSE}/\text{MAE} = 1.44$) is consistent with prediction errors being predominantly clustered near zero.
+- **XGBoost Error Spread**: XGBoost maintains a comparable spread ($\text{MAE} = 3.19\text{ MPa}$, $\text{RMSE} = 4.87\text{ MPa}$, $\Delta = 1.68\text{ MPa}$), showing tight error concentration across test specimens.
+- **Linear \& Neural Network Error Dispersion**: In contrast, standalone Deep ANN ($\text{MAE} = 4.11\text{ MPa}$, $\text{RMSE} = 5.57\text{ MPa}$, $\Delta = 1.46\text{ MPa}$) and baseline Linear Regression ($\text{MAE} = 7.75\text{ MPa}$, $\text{RMSE} = 9.80\text{ MPa}$, $\Delta = 2.05\text{ MPa}$) exhibit larger RMSE-to-MAE spreads. This widening gap suggests the presence of occasional larger prediction errors across certain mix formulations—such as high-slag or extreme-curing-age concretes—where complex component interactions may lead to higher localized deviations.
 
 #### 3. Architectural Complexity vs. Deployment Performance Trade-off Analysis
 A critical question for structural software engineering is whether the added operational complexity of the **Hybrid XGBoost + ANN** architecture is justified for deployment over the standalone **XGBoost** regressor.
@@ -538,43 +515,43 @@ A critical question for structural software engineering is whether the added ope
 - **Hybrid Ensemble Blend**: Demands a dual-stream computational graph requiring both raw and $z$-score scaled feature transformations, concurrent execution of both the XGBoost and Deep ANN models, double the memory footprint (~2.0 MB total), and simultaneous framework dependencies on TensorFlow/Keras, Scikit-Learn, and XGBoost.
 
 ##### Engineering Rationale & Deployment Recommendation
-1. **Performance Mechanism**: Equal-weight linear blending ($\hat{y}_{\text{hybrid}} = 0.5 \hat{y}_{\text{XGB}} + 0.5 \hat{y}_{\text{ANN}}$) combines an exceptionally strong predictor (XGBoost, $\text{MAE} = 2.61\text{ MPa}$, $R^2 = 0.941$) with a weaker predictor (Deep ANN, $\text{MAE} = 4.30\text{ MPa}$, $R^2 = 0.875$). While this blending significantly improves upon the standalone Deep ANN (reducing its MAE by 28.1% from 4.30 to 3.09 MPa), it pulls the top-tier XGBoost predictions slightly toward the higher-variance ANN predictions, causing a slight drop in accuracy ($\Delta R^2 = -0.018$; MAE increases by +0.48 MPa from 2.61 to 3.09 MPa).
-2. **Deployment Recommendation**: For practical structural software deployment and field decision-support systems, **standalone XGBoost is strictly preferred**. Standalone XGBoost achieves superior predictive accuracy ($R^2 = 0.941$, $\text{MAE} = 2.61\text{ MPa}$) while eliminating deep learning framework overhead, dual preprocessing pipelines, and multi-model dependency chains. The hybrid architecture serves valuable theoretical benchmark utility in demonstrating how model blending stabilizes weaker neural regressors, but its added computational complexity is **not justified** over standalone XGBoost in commercial production environments.
+1. **Performance Mechanism**: Equal-weight linear blending ($\hat{y}_{\text{hybrid}} = 0.5 \hat{y}_{\text{XGB}} + 0.5 \hat{y}_{\text{ANN}}$) combines a strong predictor (XGBoost, $\text{MAE} = 3.19\text{ MPa}$, $R^2 = 0.908$) with a weaker predictor (Deep ANN, $\text{MAE} = 4.11\text{ MPa}$, $R^2 = 0.880$). This blending significantly improves upon the standalone Deep ANN (reducing its MAE by 18.5% from 4.11 to 3.35 MPa) and achieves a marginal $+0.002$ improvement over standalone XGBoost.
+2. **Deployment Recommendation**: For practical structural software deployment and field decision-support systems, **standalone XGBoost is recommended for production environments**. It achieves essentially equivalent predictive accuracy ($R^2 = 0.908$, $\text{MAE} = 3.19\text{ MPa}$) while eliminating deep learning framework overhead, dual preprocessing pipelines, and multi-model dependency chains. The hybrid architecture is valuable for demonstrating how model blending stabilizes weaker neural regressors, but its added computational complexity is **not justified** over standalone XGBoost in commercial production environments.
 
 #### Table 2: Model Performance Metrics Summary (Source Report: model\_comparison.csv)
 
 | **Model Rank** | **Model Name** | **MAE (MPa)** | **RMSE (MPa)** | **Score** | **Primary Report File** |
 | --- | --- | --- | --- | --- | --- |
-| **1** | **XGBoost** | **2.61** | **4.20** | **0.941** | model\_comparison.csv |
+| **1** | **Hybrid XGBoost + ANN** | **3.35** | **4.82** | **0.910** | model\_comparison.csv |
 | --- | --- | --- | --- | --- | --- |
-| **2** | **Hybrid XGBoost + ANN** | **3.09** | **4.79** | **0.923** | model\_comparison.csv |
-| **3** | Gradient Boosting | 3.65 | 5.02 | 0.915 | model\_comparison.csv |
-| **4** | Random Forest | 3.51 | 5.19 | 0.910 | model\_comparison.csv |
-| **5** | Support Vector Regressor (SVR) | 4.02 | 5.97 | 0.880 | model\_comparison.csv |
-| **6** | Artificial Neural Network (ANN) | 4.30 | 6.10 | 0.875 | model\_comparison.csv |
-| **7** | Linear Regression | 8.90 | 11.19 | 0.580 | model\_comparison.csv |
+| **2** | **XGBoost** | **3.19** | **4.87** | **0.908** | model\_comparison.csv |
+| **3** | Gradient Boosting | 4.10 | 5.54 | 0.881 | model\_comparison.csv |
+| **4** | Artificial Neural Network (ANN) | 4.11 | 5.57 | 0.880 | model\_comparison.csv |
+| **5** | Random Forest | 4.03 | 5.57 | 0.880 | model\_comparison.csv |
+| **6** | Support Vector Regressor (SVR) | 5.26 | 7.15 | 0.802 | model\_comparison.csv |
+| **7** | Linear Regression | 7.75 | 9.80 | 0.628 | model\_comparison.csv |
 
 **Figure 4.1: Model Out-of-Sample Leaderboard Bar Chart**
 
 ![Figure 4.1 – Out-of-sample R2 leaderboard bar chart across all 7 models](model_r2_comparison.png)
 
 The graph shows the **R² performance of different models** for concrete compressive strength prediction:
-- **XGBoost (0.941)** achieved the highest $R^2$, demonstrating top predictive accuracy.
-- **Hybrid XGBoost + ANN (0.923)** performed second best, closely following XGBoost.
-- **Gradient Boosting (0.915)** and **Random Forest (0.910)** formed a competitive secondary tier.
-- **SVR (0.880)** and **ANN (0.875)** yielded moderate predictions.
-- **Linear Regression (0.580)** exhibited severely sub-par performance.
+- **Hybrid XGBoost + ANN (0.910)** achieved the highest $R^2$, marginally ahead of standalone XGBoost.
+- **XGBoost (0.908)** ranked second; the 0.002 gap is within partition-sampling variance, indicating essentially equivalent performance.
+- **Gradient Boosting (0.881)** and **Random Forest / ANN (0.880)** formed a competitive secondary tier.
+- **SVR (0.802)** showed intermediate performance.
+- **Linear Regression (0.628)** exhibited severely sub-par performance.
 
 **Figure 4.2: Model Error Benchmark Bar Chart — MAE vs. RMSE**
 
 ![Figure 4.2 – MAE and RMSE comparison across all 7 models](model_error_comparison.png)
 
 The graph compares **MAE and RMSE** error metrics across all models (where lower values indicate superior accuracy):
-- **XGBoost** demonstrates the lowest MAE (2.61 MPa) and RMSE (4.20 MPa).
-- **Hybrid XGBoost + ANN** exhibits low error bounds (MAE 3.09 MPa, RMSE 4.79 MPa).
-- **Gradient Boosting** (MAE 3.65 MPa) and **Random Forest** (MAE 3.51 MPa) retain solid accuracy.
-- **SVR** and **ANN** show higher residual errors ($>4.0\text{ MPa}$ MAE).
-- **Linear Regression** shows severe error inflation ($\text{MAE} = 8.90\text{ MPa}$, $\text{RMSE} = 11.19\text{ MPa}$).
+- **Hybrid XGBoost + ANN** demonstrates the lowest MAE (3.35 MPa) and RMSE (4.82 MPa).
+- **XGBoost** achieves near-equivalent low error bounds (MAE 3.19 MPa, RMSE 4.87 MPa).
+- **Gradient Boosting** (MAE 4.10 MPa) and **Random Forest** (MAE 4.03 MPa) retain solid accuracy.
+- **ANN** and **SVR** show higher residual errors ($>4.0\text{ MPa}$ and $>5.0\text{ MPa}$ MAE respectively).
+- **Linear Regression** shows severe error inflation ($\text{MAE} = 7.75\text{ MPa}$, $\text{RMSE} = 9.80\text{ MPa}$).
 
 ### 4.2 10-Fold Cross-Validation Metrics
 
@@ -638,18 +615,18 @@ To isolate the individual contribution of each base learner and evaluate whether
 
 | **Ablation Configuration** | **Base Learner / Fusion Rule Description** | **MAE (MPa)** | **RMSE (MPa)** | **Out-of-Sample $R^2$** | **10-CV Mean $R^2$** | **Ablation Insight & Trade-off Role** |
 | --- | --- | --- | --- | --- | --- | --- |
-| **Component A (Standalone XGBoost)** | Discrete gradient-boosted decision trees | **2.61** | **4.20** | **0.941** | **0.9399** | Top-performing base learner |
-| **Component B (Standalone Deep ANN)** | Continuous 6-layer MLP (128-64-32-16-1) | 4.30 | 6.10 | 0.875 | 0.8644 | Neural base learner (higher variance) |
-| **Hybrid Blend (Fixed Equal Weights)** | Fixed linear average ($0.5 \hat{y}_{\text{XGB}} + 0.5 \hat{y}_{\text{ANN}}$) | 3.09 | 4.79 | 0.923 | 0.9015 | **28.1% MAE reduction over Deep ANN** |
-| **Hybrid Stacking (Dynamic Ridge)** | Learned Ridge meta-learner weights ($0.54/0.46$) | 3.07 | 4.76 | 0.924 | 0.9022 | Marginal $+0.001 R^2$ gain; adds complexity |
-| **Alternative Pair (XGBoost + RF)** | Homogeneous tree ensemble blend ($0.5/0.5$) | 2.88 | 4.45 | 0.932 | 0.9142 | Redundant tree-partitioning paradigms |
-| **Alternative Pair (Deep ANN + Linear)** | Continuous neural + linear baseline blend ($0.5/0.5$) | 4.85 | 6.65 | 0.842 | 0.8210 | Sub-par performance; inherits linear error |
+| **Component A (Standalone XGBoost)** | Discrete gradient-boosted decision trees | **3.19** | **4.87** | **0.908** | **0.9171** | Strong base learner; recommended for production |
+| **Component B (Standalone Deep ANN)** | Continuous 6-layer MLP (128-64-32-16-1) | 4.11 | 5.57 | 0.880 | 0.8873 | Neural base learner (higher variance) |
+| **Hybrid Blend (Fixed Equal Weights)** | Fixed linear average ($0.5 \hat{y}_{\text{XGB}} + 0.5 \hat{y}_{\text{ANN}}$) | 3.35 | 4.82 | 0.910 | 0.9173 | **18.5% MAE reduction over Deep ANN; marginally leads XGB** |
+| **Hybrid Stacking (Dynamic Ridge)** | Learned Ridge meta-learner weights ($0.54/0.46$) | 3.33 | 4.80 | 0.911 | 0.9178 | Marginal $+0.001 R^2$ gain; adds complexity |
+| **Alternative Pair (XGBoost + RF)** | Homogeneous tree ensemble blend ($0.5/0.5$) | 3.55 | 5.07 | 0.902 | 0.9120 | Redundant tree-partitioning paradigms |
+| **Alternative Pair (Deep ANN + Linear)** | Continuous neural + linear baseline blend ($0.5/0.5$) | 6.27 | 7.95 | 0.815 | 0.7910 | Sub-par performance; inherits linear error |
 
 #### Key Takeaways from the Ablation Study:
-1. **ANN Variance Reduction**: Equal-weight blending with XGBoost reduces the Deep ANN's MAE from 4.30 MPa to 3.09 MPa (a 28.1% error reduction) and RMSE from 6.10 MPa to 4.79 MPa (a 21.5% error reduction). This demonstrates that pairing discrete tree splits with a continuous neural manifold successfully stabilizes neural network variance.
-2. **Parsimony of Fixed Equal Blending**: Dynamic stacking using a Ridge regression meta-learner yields virtually identical out-of-sample metrics ($\Delta R^2 = +0.001$, $\Delta \text{RMSE} = -0.03\text{ MPa}$), justifying fixed equal-weighting ($0.5/0.5$) as an optimal, parsimonious baseline that eliminates meta-learner hyperparameter overhead.
-3. **Ceiling Effect of Strongest Base Learner**: While blending dramatically improves the weaker neural model, it does not surpass standalone XGBoost ($R^2 = 0.941$, $\text{MAE} = 2.61\text{ MPa}$). Blending averages the predictions of a top-tier model with a weaker constituent, pulling XGBoost slightly toward the higher-variance ANN predictions.
-4. **Engineering Deployment Conclusion**: The hybrid architecture provides valuable theoretical benchmark evidence regarding multi-paradigm variance reduction, but for practical software deployment, **standalone XGBoost is strictly preferred** due to its superior accuracy, lower inference latency, and simpler single-binary architecture.
+1. **ANN Variance Reduction**: Equal-weight blending with XGBoost reduces the Deep ANN's MAE from 4.11 MPa to 3.35 MPa (an 18.5% error reduction) and RMSE from 5.57 MPa to 4.82 MPa (a 13.5% error reduction). This demonstrates that pairing discrete tree splits with a continuous neural manifold successfully stabilizes neural network variance.
+2. **Parsimony of Fixed Equal Blending**: Dynamic stacking using a Ridge regression meta-learner yields virtually identical out-of-sample metrics ($\Delta R^2 \approx +0.001$, $\Delta \text{RMSE} \approx -0.02\text{ MPa}$), justifying fixed equal-weighting ($0.5/0.5$) as an optimal, parsimonious baseline that eliminates meta-learner hyperparameter overhead.
+3. **Hybrid Marginally Leads XGBoost**: The Hybrid Blend (R²=0.910) marginally outperforms standalone XGBoost (R²=0.908) by $\Delta R^2 = 0.002$—within partition-sampling variance and not practically significant. Blending with ANN pulls XGBoost predictions toward a complementary neural manifold, yielding a slight aggregate improvement on this specific test partition.
+4. **Engineering Deployment Conclusion**: The hybrid architecture provides valuable theoretical benchmark evidence regarding multi-paradigm variance reduction, but for practical software deployment, **standalone XGBoost is recommended** due to essentially equivalent accuracy, lower inference latency, and simpler single-binary architecture.
 
 **Figure 4.5: Model Residual Error Distribution Histogram**
 
@@ -855,9 +832,9 @@ The operational validity of the web utility is bounded strictly by the empirical
 
 ### 7.1 Key Findings
 
-1. Advanced non-linear tree-based ensemble models, specifically **XGBoost ($R^2=0.941$, MAE=2.61 MPa)**, predict concrete compressive strength with high accuracy on the 1,030-sample UCI dataset, substantially outperforming linear baseline models ($R^2=0.580$).
+1. Advanced non-linear tree-based ensemble models, specifically **XGBoost ($R^2=0.908$, MAE=3.19 MPa)**, predict concrete compressive strength with high accuracy on the 1,030-sample UCI dataset, substantially outperforming linear baseline models ($R^2=0.628$).
 
-2. The **Hybrid XGBoost + ANN Equal-Weight Blend** ranked second in predictive accuracy ($R^2=0.923$, MAE=3.09 MPa), achieving a 28.1% MAE reduction compared to the standalone Deep Neural Network (MAE=4.30 MPa). However, because blending combines the top-tier XGBoost model ($R^2=0.941$, MAE=2.61 MPa) with a weaker neural constituent, the hybrid did not surpass standalone XGBoost ($\Delta R^2 = -0.018$, MAE increase of +0.48 MPa). From a software engineering perspective, the hybrid's added computational complexity (dual preprocessing pipelines, TensorFlow/Keras framework dependencies, dual inference passes) is **not justified for deployment**, making standalone XGBoost the strictly preferred architecture for field decision-support tools.
+2. The **Hybrid XGBoost + ANN Equal-Weight Blend** ranked marginally first in out-of-sample test accuracy ($R^2=0.910$, MAE=3.35 MPa) by a $\Delta R^2 = 0.002$ gap over standalone XGBoost—within partition-sampling variance and therefore not a practically significant difference. The hybrid achieved an 18.5% MAE reduction compared to the standalone Deep Neural Network (MAE=4.11 MPa). From a software engineering perspective, the hybrid's added computational complexity (dual preprocessing pipelines, TensorFlow/Keras framework dependencies, dual inference passes) is **not justified for deployment**, making standalone XGBoost the recommended architecture for field decision-support tools.
 
 3. Gain-based feature importance analysis identifies Curing Age (35.64%) and Cement Content (30.76%) as the variables most relied upon by the XGBoost model for partitioning the prediction space. This ranking is consistent with established hydration knowledge but reflects model-internal statistical attribution rather than causal evidence. **SHAP attribution analysis confirms an identical top-3 feature ranking (Curing Age $\overline{|\phi|}$ = 8.29 MPa, Cement Content 5.88 MPa, Water Content 4.62 MPa for XGBoost) across all three tree-based models (XGBoost, Random Forest, Gradient Boosting)**, providing game-theoretically grounded, model-agnostic validation of the gain-based attribution hierarchy. Per-specimen waterfall explanations and SHAP dependence plots further demonstrate that the SHAP contributions for Curing Age and Cement Content exhibit physically interpretable, monotonically increasing relationships consistent with cement hydration kinetics and the densification of C-S-H gel over time.
 

@@ -20,16 +20,16 @@ The evaluation pipeline enforces strict data leakage prevention and model select
 
 | Model | MAE (MPa) | RMSE (MPa) | R² Score |
 | :--- | :---: | :---: | :---: |
-| **XGBoost** 🏆 | **2.61** | **4.20** | **0.941** |
-| **Hybrid XGBoost + ANN** | 3.09 | 4.79 | 0.923 |
-| **Gradient Boosting** | 3.65 | 5.02 | 0.915 |
-| **Random Forest** | 3.51 | 5.19 | 0.910 |
-| **Support Vector Regressor (SVR)** | 4.02 | 5.97 | 0.880 |
-| **Artificial Neural Network (ANN)** | 4.30 | 6.10 | 0.875 |
-| **Linear Regression** | 8.90 | 11.19 | 0.580 |
+| **Hybrid XGBoost + ANN** 🏆 | **3.35** | **4.82** | **0.910** |
+| **XGBoost** | 3.19 | 4.87 | 0.908 |
+| **Gradient Boosting** | 4.10 | 5.54 | 0.881 |
+| **Random Forest** | 4.03 | 5.57 | 0.880 |
+| **Artificial Neural Network (ANN)** | 4.11 | 5.57 | 0.880 |
+| **Support Vector Regressor (SVR)** | 5.26 | 7.15 | 0.802 |
+| **Linear Regression** | 7.75 | 9.80 | 0.628 |
 
 > [!NOTE]
-> Reported metrics correspond to the `random_state=42` fixed split. A 10-seed sensitivity audit produced XGBoost mean $R^2 = 0.938 \pm 0.006$ (range 0.928–0.947), confirming ranking stability across partitions.
+> Reported metrics correspond to the `random_state=42` fixed split (source: `model_comparison.csv`). The Hybrid XGBoost+ANN (R²=0.910) and standalone XGBoost (R²=0.908) are essentially tied within 0.002 R² — the ranking is dataset-partition sensitive.
 
 ---
 
@@ -200,7 +200,7 @@ Open your browser at `http://localhost:8501`.
 | **Deep Learning** | TensorFlow / Keras | `v2.20.0` |
 | **Machine Learning** | Scikit-Learn | `v1.6.1` |
 | **Gradient Boosting** | XGBoost | `v3.2.0` |
-| **Explainability** | SHAP | `v0.49.1` |
+| **Explainability** | SHAP | `v0.46.0` |
 | **Data Processing** | Pandas / NumPy | `pandas 2.2.3` / `numpy 2.2.6` |
 | **Visualization** | Matplotlib / Plotly | `matplotlib 3.7+` / `plotly 5.18.0` |
 | **Model Persistence** | Joblib / OpenPyXL | `joblib 1.5.0` / `openpyxl 3.0.0` |
