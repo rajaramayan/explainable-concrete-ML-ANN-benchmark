@@ -1,6 +1,7 @@
 """
-Concrete Compressive Strength ML & ANN Research — Full Training Pipeline
-=========================================================================
+Explainable Machine Learning and Deep Neural Networks for Concrete Compressive Strength Prediction
+===================================================================================================
+Full Training Pipeline
 Reproduces all model artifacts and evaluation CSV files from raw UCI data.
 
 Usage:
@@ -287,13 +288,139 @@ def evaluate_test_set(models, X_test, y_test, ann_scaler):
     return results_df, predictions
 
 
-# --- 5. 10-Fold Cross-Validation ---------------------------------------------
-def cross_validate_models(models, X_train, y_train):
+# --- 5. 10-Fold Cross-Validation & Nested CV Audit --------------------------
+def run_nested_cv_audit(X_train, y_train):
     """
-    10-fold CV on the training partition only.
+    5x10 Nested Cross-Validation audit to empirically confirm that model selection
+    is strictly independent of performance estimation.
+    """
+    print("      Running 5x10 Nested CV audit for tuning validation ...")
+    from sklearn.model_selection import GridSearchCV
+
+    outer_kf = KFold(n_splits=N_FOLDS, shuffle=True, random_state=RANDOM_STATE)
+
+    param_grids = {
+        "XGBoost": (
+            xgb.XGBRegressor(random_state=RANDOM_STATE, verbosity=0),
+            {
+                "n_estimators": [50, 100, 200],
+                "max_depth": [3, 6, 9],
+                "learning_rate": [0.05, 0.10, 0.20],
+            },
+        ),
+        "Random Forest": (
+            RandomForestRegressor(random_state=RANDOM_STATE),
+            {
+                "n_estimators": [50, 100, 200],
+                "max_features": ["sqrt", "log2"],
+                "min_samples_split": [2, 5],
+            },
+        ),
+        "Gradient Boosting": (
+            GradientBoostingRegressor(random_state=RANDOM_STATE),
+            {
+                "n_estimators": [50, 100, 200],
+                "max_depth": [3, 5, 7],
+                "learning_rate": [0.05, 0.10, 0.20],
+            },
+        ),
+        "SVR": (
+            SVR(kernel="rbf"),
+            {
+                "C": [1.0, 10.0, 100.0],
+                "epsilon": [0.01, 0.10, 0.20],
+            },
+        ),
+    }
+
+    nested_results = []
+    for name, (base_estimator, grid) in param_grids.items():
+        outer_scores = []
+        for train_idx, val_idx in outer_kf.split(X_train):
+            X_tr, X_val = X_train[train_idx], X_train[val_idx]
+            y_tr, y_val = y_train[train_idx], y_train[val_idx]
+
+            scaler = StandardScaler()
+            X_tr_s = scaler.fit_transform(X_tr)
+            X_val_s = scaler.transform(X_val)
+
+            inner_cv = KFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+            clf = GridSearchCV(base_estimator, grid, cv=inner_cv, scoring="r2", n_jobs=-1)
+
+            if name == "SVR":
+                clf.fit(X_tr_s, y_tr)
+                y_pred = clf.predict(X_val_s)
+            else:
+                clf.fit(X_tr, y_tr)
+                y_pred = clf.predict(X_val)
+
+            outer_scores.append(r2_score(y_val, y_pred))
+
+        nested_r2_mean = np.mean(outer_scores)
+        nested_r2_std = np.std(outer_scores)
+        print(f"      [Nested CV] {name:20s} Nested R² = {nested_r2_mean:.4f} +/- {nested_r2_std:.4f}")
+        nested_results.append({
+            "Model": name,
+            "Nested CV R2 Mean": nested_r2_mean,
+            "Nested CV R2 Std": nested_r2_std,
+        })
+
+def run_repeated_seed_sensitivity_audit(X, y, seeds=[42, 100, 2024, 7, 13, 99, 123, 456, 789, 2026]):
+    """
+    10-Seed Repeated 80/20 Hold-Out Sensitivity Audit.
+    Evaluates whether performance metrics and model rankings are sensitive to random partitioning seeds.
+    """
+    print("      Running 10-seed repeated 80/20 hold-out sensitivity audit ...")
+
+    models_to_test = {
+        "XGBoost": lambda s: xgb.XGBRegressor(n_estimators=100, learning_rate=0.10, max_depth=6, subsample=0.80, colsample_bytree=0.80, random_state=s, verbosity=0),
+        "Random Forest": lambda s: RandomForestRegressor(n_estimators=100, max_features="sqrt", min_samples_split=2, random_state=s),
+        "Gradient Boosting": lambda s: GradientBoostingRegressor(n_estimators=100, learning_rate=0.10, max_depth=3, loss="squared_error", random_state=s),
+        "SVR": lambda s: SVR(kernel="rbf", C=10.0, epsilon=0.10, gamma="scale"),
+        "Linear Regression": lambda s: LinearRegression(),
+    }
+
+    seed_results = {name: [] for name in models_to_test}
+
+    for seed in seeds:
+        X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=TEST_SIZE, random_state=seed)
+        scaler = StandardScaler()
+        X_tr_s = scaler.fit_transform(X_tr)
+        X_te_s = scaler.transform(X_te)
+
+        for name, model_fn in models_to_test.items():
+            model = model_fn(seed)
+            if name == "SVR":
+                model.fit(X_tr_s, y_tr)
+                y_pred = model.predict(X_te_s)
+            else:
+                model.fit(X_tr, y_tr)
+                y_pred = model.predict(X_te)
+
+            score = r2_score(y_te, y_pred)
+            seed_results[name].append(score)
+
+    print("      --- Multi-Seed Partitioning Sensitivity (10 Seeds) ---")
+    for name, scores in seed_results.items():
+        print(f"      [Multi-Seed] {name:20s} Mean R² = {np.mean(scores):.4f} +/- {np.std(scores):.4f} (Min: {np.min(scores):.4f}, Max: {np.max(scores):.4f})")
+
+    return seed_results
+
+
+def cross_validate_models(models, X_train, y_train, X=None, y=None):
+    """
+    10-fold CV on the training partition only under prespecified selection protocol.
     Scaling is re-fitted per fold to prevent leakage.
+    Also executes nested CV audit and multi-seed sensitivity audit.
     """
-    print("[5/6] Running 10-fold cross-validation ...")
+    print("[5/6] Running 10-fold cross-validation, Nested CV Audit & Multi-Seed Audit ...")
+
+    # Run nested CV audit first
+    nested_df = run_nested_cv_audit(X_train, y_train)
+
+    # Run multi-seed sensitivity audit if full dataset is provided
+    if X is not None and y is not None:
+        run_repeated_seed_sensitivity_audit(X, y)
 
     kf = KFold(n_splits=N_FOLDS, shuffle=True, random_state=RANDOM_STATE)
 
@@ -423,8 +550,8 @@ def main():
     # Step 4: Evaluate on test set
     results_df, predictions = evaluate_test_set(models, X_test, y_test, ann_scaler)
 
-    # Step 5: 10-fold CV
-    cv_df = cross_validate_models(models, X_train, y_train)
+    # Step 5: 10-fold CV & Multi-Seed Audit
+    cv_df = cross_validate_models(models, X_train, y_train, X, y)
 
     # Step 6: Feature importance & predictions
     fi_df = save_feature_importance(models)

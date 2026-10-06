@@ -1,19 +1,23 @@
 """
-Concrete Compressive Strength ML & ANN Research — Streamlit Cloud entry point.
-Ultra-reliable navigation using st.sidebar.radio (prevents blank screen on Streamlit Cloud routing).
+Explainable Machine Learning and Deep Neural Networks for Concrete Compressive Strength Prediction
+===================================================================================================
+Streamlit Web Application
 """
 import sys
 import os
 import warnings
 import traceback
 
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+
 warnings.filterwarnings("ignore")
 
-# ─── scikit-learn backwards-compat shim ──────────────────────────────────────
+# ─── Compatibility shim for old scikit-learn gradient boosting pickles ────────
 for _mod in ("sklearn._loss.loss", "sklearn._loss"):
     try:
-        import importlib as _il
-        _m = _il.import_module(_mod)
+        import importlib
+        _m = importlib.import_module(_mod)
         sys.modules.setdefault("_loss", _m)
         break
     except Exception:
@@ -26,43 +30,20 @@ import joblib
 import plotly.express as px
 import plotly.graph_objects as go
 
-try:
-    import keras
-except Exception:
-    keras = None
-
 # ─────────────────────────────────────────────────────────────────────────────
-# Page config  (must be first st.* call)
+# Page config  (must come before any other st call)
 # ─────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Concrete Strength ML & ANN",
+    page_title="Explainable Concrete Strength ML & ANN | Benchmark Study",
     page_icon="🏗️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Helpers
+# Global CSS & Helpers
 # ─────────────────────────────────────────────────────────────────────────────
-def _chart(fig, height=None):
-    """Plotly chart helper compatible across Streamlit versions."""
-    if height:
-        fig.update_layout(height=height)
-    try:
-        st.plotly_chart(fig, width="stretch")
-    except Exception:
-        st.plotly_chart(fig)
-
-
-def _df(df_in, **kw):
-    """Dataframe helper compatible across Streamlit versions."""
-    try:
-        st.dataframe(df_in, width="stretch", **kw)
-    except Exception:
-        st.dataframe(df_in, **kw)
-
-
-def _css():
+def _inject_css():
     st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
@@ -128,6 +109,25 @@ div[data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
 </style>""", unsafe_allow_html=True)
 
 
+def _chart(fig, height=None):
+    if height:
+        fig.update_layout(height=height)
+    try:
+        st.plotly_chart(fig, use_container_width=True)
+    except Exception:
+        st.plotly_chart(fig)
+
+
+def _df(df_in, **kw):
+    try:
+        st.dataframe(df_in, hide_index=True, width="stretch", **kw)
+    except Exception:
+        try:
+            st.dataframe(df_in, hide_index=True, **kw)
+        except Exception:
+            st.dataframe(df_in, **kw)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Constants
 # ─────────────────────────────────────────────────────────────────────────────
@@ -142,30 +142,38 @@ ALL_MODELS = [
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Cached loaders (process-level)
+# Data / Model Loaders
 # ─────────────────────────────────────────────────────────────────────────────
 @st.cache_resource(show_spinner="Loading ML models…")
-def _load_models():
-    m, fails = {}, []
-    for name, fname in [
+def load_models():
+    models, warnings_list = {}, []
+
+    for name, filename in [
         ("XGBoost",           "xgboost.joblib"),
         ("Random Forest",     "random_forest.joblib"),
         ("Gradient Boosting", "gradient_boosting.joblib"),
         ("SVR",               "svr.joblib"),
         ("Linear Regression", "linear_regression.joblib"),
     ]:
-        if os.path.exists(fname):
+        if os.path.exists(filename):
             try:
-                m[name] = joblib.load(fname)
+                models[name] = joblib.load(filename)
             except Exception as e:
-                fails.append(f"{name}: {e}")
+                warnings_list.append(f"Failed to load {name}: {e}")
         else:
-            fails.append(f"{name}: file not found")
+            warnings_list.append(f"Model file {filename} not found.")
 
-    ann = None
-    if keras is not None and os.path.exists("ann_model.keras"):
+    ann_model = None
+    if os.path.exists("ann_weights.joblib"):
         try:
-            ann = keras.Sequential([
+            ann_model = joblib.load("ann_weights.joblib")
+        except Exception as e:
+            warnings_list.append(f"ANN weights load error: {e}")
+
+    if ann_model is None and os.path.exists("ann_model.keras"):
+        try:
+            import keras
+            ann_model = keras.Sequential([
                 keras.layers.Input(shape=(8,)),
                 keras.layers.Dense(128, activation="relu"),
                 keras.layers.Dense(64,  activation="relu"),
@@ -174,106 +182,111 @@ def _load_models():
                 keras.layers.Dense(16,  activation="relu"),
                 keras.layers.Dense(1,   activation="linear"),
             ])
-            ann.load_weights("ann_model.keras")
+            ann_model.load_weights("ann_model.keras")
         except Exception as e:
-            fails.append(f"ANN: {e}")
-            ann = None
+            warnings_list.append(f"Keras ANN load error: {e}")
+            ann_model = None
 
-    if ann is None and os.path.exists("ann_weights.joblib"):
-        try:
-            ann = joblib.load("ann_weights.joblib")
-        except Exception as e:
-            fails.append(f"ANN weights: {e}")
-
-    m["Artificial Neural Network"] = ann
+    models["Artificial Neural Network"] = ann_model
 
     scaler = None
     if os.path.exists("ann_scaler.joblib"):
         try:
             scaler = joblib.load("ann_scaler.joblib")
         except Exception as e:
-            fails.append(f"Scaler: {e}")
+            warnings_list.append(f"ANN scaler load error: {e}")
 
-    return m, scaler, fails
+    return models, scaler, warnings_list
 
 
 @st.cache_data(show_spinner="Loading datasets…")
-def _load_datasets():
-    d, fails = {}, []
-    for key, fname in [
+def load_datasets():
+    datasets, warnings_list = {}, []
+    for key, filename in [
         ("comparison",         "model_comparison.csv"),
         ("feature_importance", "feature_importance.csv"),
         ("cv",                 "10_fold_cross_validation.csv"),
         ("test_pred",          "test_predictions.csv"),
+        ("shap_summary",       "shap_summary.csv"),
     ]:
-        if os.path.exists(fname):
+        if os.path.exists(filename):
             try:
-                d[key] = pd.read_csv(fname)
+                datasets[key] = pd.read_csv(filename)
             except Exception as e:
-                fails.append(f"{fname}: {e}")
+                warnings_list.append(f"Failed to load {filename}: {e}")
         else:
-            fails.append(f"{fname}: not found")
-    return d, fails
+            warnings_list.append(f"Dataset {filename} not found.")
+
+    return datasets, warnings_list
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Inference
+# Prediction Helpers
 # ─────────────────────────────────────────────────────────────────────────────
-def _ann_predict(m, scaler, X_df):
-    ann = m.get("Artificial Neural Network")
-    X   = scaler.transform(X_df) if scaler is not None else X_df.values
+def predict_ann(models, scaler, X_df):
+    ann = models.get("Artificial Neural Network")
+    X = scaler.transform(X_df) if scaler is not None else X_df.values
+
     if ann is None:
         return np.zeros(len(X_df))
+
     if isinstance(ann, dict):
         weights = [ann[f"layer_{i}"] for i in range(len(ann))]
         out = X
         for i in range(0, len(weights) - 2, 2):
             out = np.maximum(0, out @ weights[i] + weights[i+1])
         return (out @ weights[-2] + weights[-1]).flatten()
+
     if isinstance(ann, list):
         out = X
         for W, b in ann[:-1]:
             out = np.maximum(0, out @ W + b)
         W, b = ann[-1]
         return (out @ W + b).flatten()
+
     if keras is not None:
         return ann.predict(X, verbose=0).flatten()
+
     return np.zeros(len(X_df))
 
 
-def _predict(m, scaler, X_df, name):
-    if name == "Artificial Neural Network":
-        return _ann_predict(m, scaler, X_df)
-    if name == "Hybrid XGBoost + ANN":
-        xp = m["XGBoost"].predict(X_df) if "XGBoost" in m else np.zeros(len(X_df))
-        return (xp + _ann_predict(m, scaler, X_df)) / 2
-    mdl = m.get(name)
-    return mdl.predict(X_df) if mdl else np.zeros(len(X_df))
+def predict_model(models, scaler, X_df, model_name):
+    if model_name == "Artificial Neural Network":
+        return predict_ann(models, scaler, X_df)
+    if model_name == "Hybrid XGBoost + ANN":
+        xgb_p = models["XGBoost"].predict(X_df) if "XGBoost" in models else np.zeros(len(X_df))
+        ann_p = predict_ann(models, scaler, X_df)
+        return (xgb_p + ann_p) / 2
+    mdl = models.get(model_name)
+    if mdl is not None:
+        return mdl.predict(X_df)
+    return np.zeros(len(X_df))
 
 
-def _cat(s):
-    if s < 20: return "Low Strength",             "badge-lo", "Non-structural / footpaths."
-    if s < 40: return "Standard Structural",       "badge-md", "Slabs, columns, beams, footings."
-    if s < 60: return "High-Strength (HSC)",       "badge-hi", "High-rise pillars, pre-stressed girders."
-    return     "Ultra-High Performance (UHPC)",    "badge-hi", "Nuclear shielding, extreme structures."
+def get_strength_category(strength):
+    if strength < 20: return "Low Strength",             "badge-lo", "Non-structural / footpaths."
+    if strength < 40: return "Standard Structural",       "badge-md", "Slabs, columns, beams, footings."
+    if strength < 60: return "High-Strength (HSC)",       "badge-hi", "High-rise pillars, pre-stressed girders."
+    return                   "Ultra-High Performance (UHPC)", "badge-hi", "Nuclear shielding, extreme structures."
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Page functions
+# Pages
 # ═════════════════════════════════════════════════════════════════════════════
 
-def pg_predictor():
-    _css()
+def page_predictor():
+    _inject_css()
     try:
-        m, scaler, fails = _load_models()
+        models, scaler, fails = load_models()
         if fails:
-            with st.expander("⚠️ Model load warnings"):
-                [st.warning(f) for f in fails]
+            with st.expander("⚠️ Model Load Warnings"):
+                for f in fails:
+                    st.warning(f)
 
         st.markdown("""
         <div class="hero">
-          <h1>🏗️ Concrete Compressive Strength Predictor</h1>
-          <p>Simulate concrete mix formulations and predict compressive strength (MPa).</p>
+          <h1>🏗️ Explainable Concrete Compressive Strength Predictor</h1>
+          <p>Simulate concrete mix formulations and predict compressive strength (MPa) with AI/ML & SHAP explainability.</p>
         </div>""", unsafe_allow_html=True)
 
         PRESETS = {
@@ -296,7 +309,7 @@ def pg_predictor():
             st.subheader("⚙️ Mix Parameters")
             pc = st.columns(4)
             for i, nm in enumerate(PRESETS):
-                pc[i].button(nm, on_click=_preset, args=(nm,), key=f"pr_btn_{i}")
+                pc[i].button(nm, on_click=_preset, args=(nm,), key=f"pr_btn_{i}", use_container_width=True)
             st.markdown("---")
             c1, c2 = st.columns(2)
             with c1:
@@ -322,11 +335,11 @@ def pg_predictor():
             sel = st.selectbox("Model:", ALL_MODELS, key="pr_model")
             row = pd.DataFrame([[cement,slag,flyash,water,sp,ca,fi,age]], columns=FEATURES)
             try:
-                strength = float(_predict(m, scaler, row, sel)[0])
+                strength = float(predict_model(models, scaler, row, sel)[0])
             except Exception as e:
                 st.error(f"Prediction error: {e}")
                 strength = 0.0
-            cat_t, badge, usage = _cat(strength)
+            cat_t, badge, usage = get_strength_category(strength)
             st.markdown(f"""
             <div class="result-box">
               <div style="color:#94a3b8;font-size:.9rem;font-weight:600;">PREDICTED STRENGTH</div>
@@ -335,21 +348,36 @@ def pg_predictor():
             </div>""", unsafe_allow_html=True)
             st.info(f"**Use case:** {usage}")
 
-            st.markdown("---")
-            st.subheader("All-Model Comparison")
-            rows = []
-            for mn in ALL_MODELS:
-                try:
-                    v = float(_predict(m, scaler, row, mn)[0])
-                except Exception:
-                    v = 0.0
-                rows.append({"Model": mn, "Strength (MPa)": v})
-            fig = px.bar(pd.DataFrame(rows), x="Strength (MPa)", y="Model",
-                         orientation="h", color="Strength (MPa)",
-                         color_continuous_scale="Blues", text_auto=".2f")
-            fig.update_layout(height=300, margin=dict(l=0,r=10,t=10,b=10),
-                               showlegend=False, yaxis_title=None)
-            _chart(fig)
+        # Full-width 7-Model Comparison Chart
+        st.markdown("---")
+        st.subheader("📊 Live Prediction Comparison Across All 7 Models")
+        rows = []
+        for mn in ALL_MODELS:
+            try:
+                v = float(predict_model(models, scaler, row, mn)[0])
+            except Exception:
+                v = 0.0
+            rows.append({"Model": mn, "Strength (MPa)": v})
+
+        comp_df_pred = pd.DataFrame(rows)
+        fig = px.bar(
+            comp_df_pred,
+            x="Strength (MPa)",
+            y="Model",
+            orientation="h",
+            color="Strength (MPa)",
+            color_continuous_scale="Blues",
+            text_auto=".2f",
+        )
+        fig.update_layout(
+            height=380,
+            margin=dict(l=230, r=40, t=20, b=40),
+            showlegend=False,
+            xaxis_title="Predicted Compressive Strength (MPa)",
+            yaxis_title=None,
+            yaxis=dict(type="category", dtick=1, automargin=True),
+        )
+        _chart(fig)
 
         st.markdown("---")
         with st.expander("Batch Prediction — Upload CSV"):
@@ -367,7 +395,7 @@ def pg_predictor():
                     res = bdf.copy()
                     for mn in ALL_MODELS:
                         try:
-                            res[f"{mn} (MPa)"] = np.round(_predict(m, scaler, bdf[FEATURES], mn), 2)
+                            res[f"{mn} (MPa)"] = np.round(predict_model(models, scaler, bdf[FEATURES], mn), 2)
                         except Exception:
                             res[f"{mn} (MPa)"] = np.nan
                     _df(res.head(10))
@@ -380,10 +408,10 @@ def pg_predictor():
 
 # ─────────────────────────────────────────────────────────────────────────────
 
-def pg_models():
-    _css()
+def page_models():
+    _inject_css()
     try:
-        datasets, fails = _load_datasets()
+        datasets, fails = load_datasets()
         if fails:
             with st.expander("⚠️ Dataset warnings"):
                 [st.warning(f) for f in fails]
@@ -418,8 +446,10 @@ def pg_models():
                     fig = px.bar(comp, x="R2", y="Model", orientation="h",
                                  title="R² Score (Higher is Better)",
                                  color="R2", color_continuous_scale="Viridis", text_auto=".3f")
-                    fig.update_layout(showlegend=False, yaxis={"categoryorder":"total ascending"})
-                    _chart(fig, 320)
+                    fig.update_layout(showlegend=False,
+                                      yaxis={"categoryorder":"total ascending", "type": "category", "dtick": 1, "automargin": True},
+                                      margin=dict(l=230, r=30, t=40, b=30))
+                    _chart(fig, 360)
                 fig2 = px.bar(comp, x="Model", y=["MAE","RMSE"], barmode="group",
                               title="MAE & RMSE (Lower is Better)",
                               color_discrete_sequence=["#38bdf8","#f43f5e"])
@@ -465,70 +495,113 @@ def pg_models():
 
 # ─────────────────────────────────────────────────────────────────────────────
 
-def pg_features():
-    _css()
+def page_features():
+    _inject_css()
     try:
-        m, scaler, _ = _load_models()
-        datasets, _  = _load_datasets()
+        models, scaler, _ = load_models()
+        datasets, _  = load_datasets()
 
         st.markdown("""
         <div class="hero">
-          <h1>🔍 Feature Importance & Sensitivity</h1>
-          <p>How each mix parameter drives compressive strength.</p>
+          <h1>🔍 Explainability & Feature Attribution Dashboard</h1>
+          <p>Game-theoretic SHAP (SHapley Additive exPlanations), feature gain importance, and interactive sensitivity simulations.</p>
         </div>""", unsafe_allow_html=True)
 
-        feat = datasets.get("feature_importance", pd.DataFrame())
-        c1, c2 = st.columns([1, 1.3])
+        tab_shap, tab_gain = st.tabs([
+            "🔮 SHAP Feature Attribution Analysis",
+            "📊 Gain Importance & Sensitivity Simulator"
+        ])
 
-        with c1:
-            st.subheader("Feature Importance (XGBoost)")
-            if not feat.empty:
-                fsort = feat.sort_values("Importance", ascending=True)
-                fig = px.bar(fsort, x="Importance", y="Feature", orientation="h",
-                             color="Importance", color_continuous_scale="Blues", text_auto=".3f")
-                fig.update_layout(showlegend=False, yaxis_title=None, xaxis_title="Importance")
-                _chart(fig, 430)
-                st.info("Age + Cement explain ~66% of strength variance.")
+        with tab_shap:
+            st.subheader("Cross-Model SHAP Summary (Mean |SHAP|, MPa)")
+            shap_df = datasets.get("shap_summary", pd.DataFrame())
+            if not shap_df.empty:
+                _df(shap_df)
             else:
-                st.info("feature_importance.csv not found.")
+                st.info("`shap_summary.csv` not found. Run `python shap_analysis.py` to generate.")
 
-        with c2:
-            st.subheader("Strength Growth Simulator")
-            sc  = st.slider("Cement (kg/m³)",   min_value=150, max_value=500, value=300, key="fs_c")
-            sw  = st.slider("Water (kg/m³)",     min_value=130, max_value=220, value=180, key="fs_w")
-            ssp = st.slider("Superplasticizer",  min_value=0.0, max_value=20.0, value=6.0, key="fs_sp")
-            sm  = st.selectbox("Model:", ["XGBoost","Hybrid XGBoost + ANN",
-                                          "Random Forest","Artificial Neural Network"],
-                               key="fs_m")
-            ages = np.arange(1, 181, 2)
-            bdf  = pd.DataFrame([[sc,70,50,sw,ssp,950,750,int(a)] for a in ages],
-                                 columns=FEATURES)
+            st.markdown("---")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.subheader("SHAP Beeswarm Summary (XGBoost)")
+                if os.path.exists("shap_summary_xgboost.png"):
+                    st.image("shap_summary_xgboost.png", caption="Figure 5.4: XGBoost SHAP Beeswarm Summary Plot (All 1,030 Specimens)")
+                else:
+                    st.info("`shap_summary_xgboost.png` not found.")
+
+            with c2:
+                st.subheader("Cross-Model SHAP Comparison")
+                if os.path.exists("shap_comparison_all_models.png"):
+                    st.image("shap_comparison_all_models.png", caption="Figure 5.3: Cross-Model SHAP Attribution Comparison")
+                elif os.path.exists("shap_bar_xgboost.png"):
+                    st.image("shap_bar_xgboost.png", caption="Figure 5.2: XGBoost Mean |SHAP| Bar Chart")
+
+            st.markdown("---")
+            st.subheader("Waterfall Explanation (Individual Specimen #0)")
+            if os.path.exists("shap_waterfall_sample.png"):
+                st.image("shap_waterfall_sample.png", caption="Figure 5.7: XGBoost SHAP Waterfall Decomposition for Test Specimen #0")
+
+            st.markdown("---")
+            st.subheader("SHAP Feature Dependence Plots")
+            d1, d2 = st.columns(2)
+            with d1:
+                if os.path.exists("shap_dependence_age.png"):
+                    st.image("shap_dependence_age.png", caption="Figure 5.5: SHAP Dependence Plot — Curing Age")
+            with d2:
+                if os.path.exists("shap_dependence_cement.png"):
+                    st.image("shap_dependence_cement.png", caption="Figure 5.6: SHAP Dependence Plot — Cement Content")
+
+        with tab_gain:
+            feat = datasets.get("feature_importance", pd.DataFrame())
+            c1, c2 = st.columns([1, 1.3])
+
+            with c1:
+                st.subheader("Feature Importance (XGBoost Gain)")
+                if not feat.empty:
+                    fsort = feat.sort_values("Importance", ascending=True)
+                    fig = px.bar(fsort, x="Importance", y="Feature", orientation="h",
+                                 color="Importance", color_continuous_scale="Blues", text_auto=".3f")
+                    fig.update_layout(showlegend=False, yaxis_title=None, xaxis_title="Importance")
+                    _chart(fig, 430)
+                    st.info("Age + Cement explain ~66% of strength variance.")
+                else:
+                    st.info("feature_importance.csv not found.")
+
+            with c2:
+                st.subheader("Strength Growth Simulator")
+                sc  = st.slider("Cement (kg/m³)",   min_value=150, max_value=500, value=300, key="fs_c")
+                sw  = st.slider("Water (kg/m³)",     min_value=130, max_value=220, value=180, key="fs_w")
+                ssp = st.slider("Superplasticizer",  min_value=0.0, max_value=20.0, value=6.0, key="fs_sp")
+                sm  = st.selectbox("Model:", ALL_MODELS, key="fs_m")
+                ages = np.arange(1, 181, 2)
+                bdf  = pd.DataFrame([[sc,70,50,sw,ssp,950,750,int(a)] for a in ages],
+                                     columns=FEATURES)
+                try:
+                    y = predict_model(models, scaler, bdf, sm)
+                except Exception as e:
+                    st.error(f"Prediction error: {e}")
+                    y = np.zeros(len(ages))
+                fig = px.line(pd.DataFrame({"Age": ages, "Strength (MPa)": y}),
+                              x="Age", y="Strength (MPa)",
+                              title=f"Growth Curve — {sm}", markers=True)
+                fig.update_traces(line_color="#38bdf8", line_width=3)
+                fig.add_vline(x=28, line_dash="dash", line_color="#10b981", annotation_text="28-Day")
+                _chart(fig, 370)
+
+            st.markdown("---")
+            st.subheader("Water/Cement Ratio Sensitivity")
+            wrange = np.linspace(130, 240, 30)
+            wbdf   = pd.DataFrame([[300,70,50,w,6,950,750,28] for w in wrange], columns=FEATURES)
             try:
-                y = _predict(m, scaler, bdf, sm)
+                wy = predict_model(models, scaler, wbdf, "XGBoost")
             except Exception as e:
                 st.error(f"Prediction error: {e}")
-                y = np.zeros(len(ages))
-            fig = px.line(pd.DataFrame({"Age": ages, "Strength (MPa)": y}),
-                          x="Age", y="Strength (MPa)",
-                          title=f"Growth Curve — {sm}", markers=True)
-            fig.update_traces(line_color="#38bdf8", line_width=3)
-            fig.add_vline(x=28, line_dash="dash", line_color="#10b981", annotation_text="28-Day")
-            _chart(fig, 370)
-
-        st.markdown("---")
-        st.subheader("Water/Cement Ratio Sensitivity")
-        wrange = np.linspace(130, 240, 30)
-        wbdf   = pd.DataFrame([[300,70,50,w,6,950,750,28] for w in wrange], columns=FEATURES)
-        try:
-            wy = _predict(m, scaler, wbdf, "XGBoost")
-        except Exception as e:
-            st.error(f"Prediction error: {e}")
-            wy = np.zeros(30)
-        fig = px.line(pd.DataFrame({"w/c Ratio": wrange/300, "Strength (MPa)": wy}),
-                      x="w/c Ratio", y="Strength (MPa)",
-                      title="Strength vs w/c Ratio — XGBoost", markers=True)
-        fig.update_traces(line_color="#f43f5e", line_width=3)
-        _chart(fig, 360)
+                wy = np.zeros(30)
+            fig = px.line(pd.DataFrame({"w/c Ratio": wrange/300, "Strength (MPa)": wy}),
+                          x="w/c Ratio", y="Strength (MPa)",
+                          title="Strength vs w/c Ratio — XGBoost", markers=True)
+            fig.update_traces(line_color="#f43f5e", line_width=3)
+            _chart(fig, 360)
     except Exception:
         st.error("Error on Feature Analysis page:")
         st.code(traceback.format_exc())
@@ -536,10 +609,10 @@ def pg_features():
 
 # ─────────────────────────────────────────────────────────────────────────────
 
-def pg_dataset():
-    _css()
+def page_dataset():
+    _inject_css()
     try:
-        datasets, fails = _load_datasets()
+        datasets, fails = load_datasets()
         if fails:
             with st.expander("⚠️ Dataset warnings"):
                 [st.warning(f) for f in fails]
@@ -591,26 +664,26 @@ def pg_dataset():
 
 # ─────────────────────────────────────────────────────────────────────────────
 
-def pg_specs():
-    _css()
+def page_specs():
+    _inject_css()
     try:
         st.markdown("""
         <div class="hero">
           <h1>ℹ️ Research Architecture & Specs</h1>
-          <p>ANN architecture, ensemble strategy, training methodology, and dataset details.</p>
+          <p>7-model benchmark architecture, ANN & ensemble design, SHAP explainability methodology, training pipeline, and UCI dataset details.</p>
         </div>""", unsafe_allow_html=True)
 
-        c1, c2 = st.columns([1.2, 1])
+        c1, c2 = st.columns([1, 1])
         with c1:
             st.subheader("🧠 ANN Architecture")
             st.code("""
-Input   :  8 features (concrete mix parameters)
+Input   :  8 concrete mix features
 Dense   : 128 units, ReLU
 Dense   :  64 units, ReLU
 Dropout :  rate = 0.2
 Dense   :  32 units, ReLU
 Dense   :  16 units, ReLU
-Output  :   1 unit,  Linear  -> MPa
+Output  :   1 unit, Linear -> MPa
             """, language="text")
             st.markdown("""
 **Optimiser:** Adam (lr = 0.001)  
@@ -623,13 +696,28 @@ Output  :   1 unit,  Linear  -> MPa
             st.subheader("⚡ Hybrid Ensemble Formula")
             st.latex(r"\hat{y}_{hybrid} = 0.5\,\hat{y}_{XGBoost} + 0.5\,\hat{y}_{ANN}")
 
-            data = {
-                "Model":          ["XGBoost","Hybrid","GBM","RF","ANN","SVR","Linear Reg."],
-                "R²":             [0.941, 0.923, 0.915, 0.910, 0.875, 0.880, 0.580],
-                "MAE (MPa)":      [2.61,  2.89,  3.10,  3.24,  4.12,  3.87, 8.91],
-                "RMSE (MPa)":     [4.20,  4.71,  4.98,  5.14,  5.93,  5.68,11.30],
-            }
-            _df(pd.DataFrame(data))
+            if os.path.exists("model_comparison.csv"):
+                try:
+                    df_comp = pd.read_csv("model_comparison.csv")
+                    df_comp["R²"] = df_comp["R2"].apply(lambda v: f"{v:.3f}")
+                    df_comp["MAE (MPa)"] = df_comp["MAE"].apply(lambda v: f"{v:.2f}")
+                    df_comp["RMSE (MPa)"] = df_comp["RMSE"].apply(lambda v: f"{v:.2f}")
+                    show_df = df_comp[["Model", "MAE (MPa)", "RMSE (MPa)", "R²"]]
+                except Exception:
+                    show_df = None
+            else:
+                show_df = None
+
+            if show_df is None:
+                data = {
+                    "Model":          ["XGBoost","Hybrid","Gradient Boosting","Random Forest","SVR","ANN","Linear Reg."],
+                    "MAE (MPa)":      [2.61,  3.09,  3.65,  3.51,  4.02,  4.30, 8.90],
+                    "RMSE (MPa)":     [4.20,  4.79,  5.02,  5.19,  5.97,  6.10,11.19],
+                    "R²":             [0.941, 0.923, 0.915, 0.910, 0.880, 0.875, 0.580],
+                }
+                show_df = pd.DataFrame(data)
+
+            _df(show_df)
 
         st.markdown("---")
         st.subheader("📚 Dataset: UCI Concrete Compressive Strength")
@@ -643,8 +731,10 @@ Output  :   1 unit,  Linear  -> MPa
 | Strength range | 2.33 – 82.60 MPa |
 | Source | I-Cheng Yeh, 1998 (UCI ML Repository) |
         """)
-        st.caption("Concrete Compressive Strength ML & ANN Research "
-                   "| Streamlit · XGBoost · Scikit-Learn · Keras")
+        st.warning("⚠️ **Operational Scope & Recalibration Notice:** This deployment operates strictly as an interpolation utility within empirical dataset boundaries (Cement 102–540 kg/m³, Water 127–247 kg/m³, Age 1–365 days, lab curing ~20°C). Models do not explicitly account for aggregate mineralogy, cement chemical composition, ambient curing temperature, or specific admixture brand formulations. Field engineers must recalibrate model parameters using local batch plant trial mix data before commercial structural compliance deployment.")
+
+        st.caption("Explainable Concrete Strength ML & ANN | Benchmark Study "
+                   "| Streamlit · XGBoost · SHAP · Scikit-Learn · Keras")
     except Exception:
         st.error("Error on Research Specs page:")
         st.code(traceback.format_exc())
@@ -654,7 +744,7 @@ Output  :   1 unit,  Linear  -> MPa
 # Sidebar Navigation (Guaranteed to work reliably on Streamlit Cloud)
 # ═════════════════════════════════════════════════════════════════════════════
 
-st.sidebar.markdown("## 🏗️ Concrete ML & ANN")
+st.sidebar.markdown("## 🏗️ Concrete Strength ML & ANN")
 selected_page = st.sidebar.radio(
     "Navigation Menu",
     [
@@ -664,7 +754,7 @@ selected_page = st.sidebar.radio(
         "📁 Dataset Explorer",
         "ℹ️ Research Specs",
     ],
-    key="nav_radio_menu",
+    key="nav_radio_menu_app",
     label_visibility="collapsed"
 )
 
@@ -672,12 +762,12 @@ st.sidebar.markdown("---")
 st.sidebar.info("💡 **Tip:** Change mix formulations or select different AI/ML models to compare predicted strength.")
 
 if "Interactive Predictor" in selected_page:
-    pg_predictor()
+    page_predictor()
 elif "Model Comparison" in selected_page:
-    pg_models()
+    page_models()
 elif "Feature Analysis" in selected_page:
-    pg_features()
+    page_features()
 elif "Dataset Explorer" in selected_page:
-    pg_dataset()
+    page_dataset()
 elif "Research Specs" in selected_page:
-    pg_specs()
+    page_specs()
