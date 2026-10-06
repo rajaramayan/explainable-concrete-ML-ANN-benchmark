@@ -582,34 +582,37 @@ To evaluate model stability across differing data splits and prevent overfitting
 
 #### 1. In-Text Cross-Validation Performance Summary
 Across the 10 folds, model rankings remained completely consistent with the held-out test evaluation:
-- **XGBoost** demonstrated superior generalization stability, achieving a mean cross-validation coefficient of determination of $\text{CV } R^2 = 0.9399$ with a tight fold-to-fold standard deviation of $\pm 0.0156$, a mean CV MAE of $2.67\text{ MPa}$, and a mean CV RMSE of $3.91\text{ MPa}$.
-- **Random Forest** achieved mean $\text{CV } R^2 = 0.9160 \pm 0.0164$ ($\text{CV MAE} = 3.29\text{ MPa}$, $\text{CV RMSE} = 4.65\text{ MPa}$).
-- **Gradient Boosting** achieved mean $\text{CV } R^2 = 0.9124 \pm 0.0201$ ($\text{CV MAE} = 3.48\text{ MPa}$, $\text{CV RMSE} = 4.74\text{ MPa}$).
-- **Support Vector Regressor** achieved mean $\text{CV } R^2 = 0.8766 \pm 0.0267$ ($\text{CV MAE} = 3.91\text{ MPa}$, $\text{CV RMSE} = 5.62\text{ MPa}$).
-- **Multiple Linear Regression** exhibited low accuracy and high variance ($\text{CV } R^2 = 0.5877 \pm 0.0560$, $\text{CV MAE} = 8.22\text{ MPa}$, $\text{CV RMSE} = 10.34\text{ MPa}$).
+- **Hybrid XGBoost + ANN** achieved the highest cross-validation stability, attaining $\text{CV } R^2 = 0.9173 \pm 0.0210$ ($\text{CV MAE} = 3.33\text{ MPa}$, $\text{CV RMSE} = 4.76\text{ MPa}$).
+- **XGBoost** demonstrated equivalent generalization capability with $\text{CV } R^2 = 0.9171 \pm 0.0256$ ($\text{CV MAE} = 3.13\text{ MPa}$, $\text{CV RMSE} = 4.73\text{ MPa}$).
+- **Gradient Boosting** achieved mean $\text{CV } R^2 = 0.8911 \pm 0.0342$ ($\text{CV MAE} = 3.90\text{ MPa}$, $\text{CV RMSE} = 5.43\text{ MPa}$).
+- **Deep Artificial Neural Network** achieved mean $\text{CV } R^2 = 0.8873 \pm 0.0243$ ($\text{CV MAE} = 4.12\text{ MPa}$, $\text{CV RMSE} = 5.58\text{ MPa}$).
+- **Random Forest** achieved mean $\text{CV } R^2 = 0.8867 \pm 0.0283$ ($\text{CV MAE} = 3.97\text{ MPa}$, $\text{CV RMSE} = 5.58\text{ MPa}$).
+- **Support Vector Regressor** achieved mean $\text{CV } R^2 = 0.8165 \pm 0.0400$ ($\text{CV MAE} = 5.17\text{ MPa}$, $\text{CV RMSE} = 7.12\text{ MPa}$).
+- **Multiple Linear Regression** exhibited low accuracy and high variance ($\text{CV } R^2 = 0.5951 \pm 0.0652$, $\text{CV MAE} = 8.42\text{ MPa}$, $\text{CV RMSE} = 10.60\text{ MPa}$).
 
-The low fold-to-fold standard deviations ($\le 0.020$ for tree-based models) suggest that the observed performance patterns are consistent across different cross-validation splits rather than being driven by specific data partitions.
+The low fold-to-fold standard deviations ($\le 0.025$ for top models) suggest that the observed performance patterns are consistent across different cross-validation splits rather than being driven by specific data partitions.
 
 #### Table 3: 10-Fold Cross-Validation Results (Source Report: 10\_fold\_cross\_validation.csv)
 
-| **Model Name** | **CV MAE Mean** | **CV RMSE Mean** | **CV Mean** | **CV Std** | **Source Report** |
-| --- | --- | --- | --- | --- | --- |
-| **XGBoost** | **2.67** | **3.91** | **0.9399** | **0.0156** | 10\_fold\_cross\_validation.csv |
-| --- | --- | --- | --- | --- | --- |
-| **Random Forest** | 3.29 | 4.65 | 0.9160 | 0.0164 | 10\_fold\_cross\_validation.csv |
-| **Gradient Boosting** | 3.48 | 4.74 | 0.9124 | 0.0201 | 10\_fold\_cross\_validation.csv |
-| **SVR** | 3.91 | 5.62 | 0.8766 | 0.0267 | 10\_fold\_cross\_validation.csv |
-| **Linear Regression** | 8.22 | 10.34 | 0.5877 | 0.0560 | 10\_fold\_cross\_validation.csv |
+| **Model Name** | **CV MAE Mean (MPa)** | **CV RMSE Mean (MPa)** | **CV $R^2$ Mean** | **CV $R^2$ Std** | **Source Report** |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Hybrid XGBoost + ANN** | **3.33** | **4.76** | **0.9173** | **0.0210** | 10\_fold\_cross\_validation.csv |
+| **XGBoost** | 3.13 | 4.73 | 0.9171 | 0.0256 | 10\_fold\_cross\_validation.csv |
+| **Gradient Boosting** | 3.90 | 5.43 | 0.8911 | 0.0342 | 10\_fold\_cross\_validation.csv |
+| **Artificial Neural Network** | 4.12 | 5.58 | 0.8873 | 0.0244 | 10\_fold\_cross\_validation.csv |
+| **Random Forest** | 3.97 | 5.58 | 0.8867 | 0.0283 | 10\_fold\_cross\_validation.csv |
+| **SVR** | 5.17 | 7.12 | 0.8165 | 0.0400 | 10\_fold\_cross\_validation.csv |
+| **Linear Regression** | 8.42 | 10.60 | 0.5951 | 0.0652 | 10\_fold\_cross\_validation.csv |
 
 **Figure 4.3: 10-Fold Cross-Validation Mean $R^2$ with Standard Deviation Error Bars**
 
 ![Figure 4.3 – 10-fold CV mean R2 with std error bars across models](cross_validation_r2.png)
 
-The graph displays **10-fold cross-validation R² means and standard deviation error bars**:
-- **XGBoost (~0.94)** demonstrates the highest mean $R^2$ and smallest error band.
-- **Random Forest and Gradient Boosting (~0.91)** demonstrate high stability across splits.
-- **SVR (~0.88)** displays wider fold-to-fold variability.
-- **Linear Regression (~0.58)** exhibits large standard deviation error bars ($\pm 0.056$), reflecting severe instability across differing data subsets.
+The graph displays **10-fold cross-validation R² means and standard deviation error bars across all 7 models**:
+- **Hybrid XGBoost + ANN (~0.917)** and **XGBoost (~0.917)** demonstrate the highest mean $R^2$ scores and tight error bounds.
+- **Gradient Boosting (~0.891), Deep ANN (~0.887), and Random Forest (~0.887)** demonstrate high stability across splits.
+- **SVR (~0.817)** displays wider fold-to-fold variability.
+- **Linear Regression (~0.595)** exhibits large standard deviation error bars ($\pm 0.065$), reflecting severe instability across differing data subsets.
 
 ### 4.3 Out-of-Sample Predictions & Residual Distribution Analysis
 

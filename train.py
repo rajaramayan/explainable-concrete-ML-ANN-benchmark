@@ -424,67 +424,96 @@ def cross_validate_models(models, X_train, y_train, X=None, y=None):
 
     kf = KFold(n_splits=N_FOLDS, shuffle=True, random_state=RANDOM_STATE)
 
-    # Only CV the sklearn-based models (ANN CV is expensive and not in the CSV)
-    cv_model_configs = {
-        "XGBoost": xgb.XGBRegressor(
+    fold_metrics = {
+        "XGBoost":                   {"r2": [], "mae": [], "rmse": []},
+        "Hybrid XGBoost + ANN":      {"r2": [], "mae": [], "rmse": []},
+        "Random Forest":             {"r2": [], "mae": [], "rmse": []},
+        "Gradient Boosting":         {"r2": [], "mae": [], "rmse": []},
+        "Artificial Neural Network": {"r2": [], "mae": [], "rmse": []},
+        "SVR":                       {"r2": [], "mae": [], "rmse": []},
+        "Linear Regression":         {"r2": [], "mae": [], "rmse": []},
+    }
+
+    for fold_idx, (train_idx, val_idx) in enumerate(kf.split(X_train)):
+        X_tr, X_val = X_train[train_idx], X_train[val_idx]
+        y_tr, y_val = y_train[train_idx], y_train[val_idx]
+
+        fold_scaler = StandardScaler()
+        X_tr_s = fold_scaler.fit_transform(X_tr)
+        X_val_s = fold_scaler.transform(X_val)
+
+        # 1. XGBoost
+        m_xgb = xgb.XGBRegressor(
             n_estimators=100, learning_rate=0.10, max_depth=6,
             subsample=0.80, colsample_bytree=0.80,
             random_state=RANDOM_STATE, verbosity=0,
-        ),
-        "Random Forest": RandomForestRegressor(
+        )
+        m_xgb.fit(X_tr, y_tr)
+        pred_xgb = m_xgb.predict(X_val)
+
+        # 2. Random Forest
+        m_rf = RandomForestRegressor(
             n_estimators=100, max_features="sqrt",
             min_samples_split=2, random_state=RANDOM_STATE,
-        ),
-        "Gradient Boosting": GradientBoostingRegressor(
+        )
+        m_rf.fit(X_tr, y_tr)
+        pred_rf = m_rf.predict(X_val)
+
+        # 3. Gradient Boosting
+        m_gb = GradientBoostingRegressor(
             n_estimators=100, learning_rate=0.10,
             max_depth=3, loss="squared_error", random_state=RANDOM_STATE,
-        ),
-        "SVR": SVR(kernel="rbf", C=10.0, epsilon=0.10, gamma="scale"),
-        "Linear Regression": LinearRegression(),
-    }
+        )
+        m_gb.fit(X_tr, y_tr)
+        pred_gb = m_gb.predict(X_val)
+
+        # 4. SVR
+        m_svr = SVR(kernel="rbf", C=10.0, epsilon=0.10, gamma="scale")
+        m_svr.fit(X_tr_s, y_tr)
+        pred_svr = m_svr.predict(X_val_s)
+
+        # 5. Linear Regression
+        m_lr = LinearRegression()
+        m_lr.fit(X_tr, y_tr)
+        pred_lr = m_lr.predict(X_val)
+
+        # 6. Deep ANN
+        m_ann = build_ann(input_dim=X_tr.shape[1])
+        m_ann.fit(X_tr_s, y_tr, epochs=ANN_EPOCHS, batch_size=ANN_BATCH_SIZE, verbose=0)
+        pred_ann = m_ann.predict(X_val_s, verbose=0).flatten()
+
+        # 7. Hybrid XGBoost + ANN
+        pred_hybrid = 0.5 * pred_xgb + 0.5 * pred_ann
+
+        fold_preds = {
+            "XGBoost":                   pred_xgb,
+            "Hybrid XGBoost + ANN":      pred_hybrid,
+            "Random Forest":             pred_rf,
+            "Gradient Boosting":         pred_gb,
+            "Artificial Neural Network": pred_ann,
+            "SVR":                       pred_svr,
+            "Linear Regression":         pred_lr,
+        }
+
+        for mname, pval in fold_preds.items():
+            fold_metrics[mname]["r2"].append(r2_score(y_val, pval))
+            fold_metrics[mname]["mae"].append(mean_absolute_error(y_val, pval))
+            fold_metrics[mname]["rmse"].append(rmse(y_val, pval))
 
     cv_results = []
-
-    for name, base_model in cv_model_configs.items():
-        fold_r2s = []
-        fold_maes = []
-        fold_rmses = []
-
-        for fold_idx, (train_idx, val_idx) in enumerate(kf.split(X_train)):
-            X_tr, X_val = X_train[train_idx], X_train[val_idx]
-            y_tr, y_val = y_train[train_idx], y_train[val_idx]
-
-            # Re-fit scaler per fold (leakage prevention)
-            fold_scaler = StandardScaler()
-            X_tr_s = fold_scaler.fit_transform(X_tr)
-            X_val_s = fold_scaler.transform(X_val)
-
-            # Clone the model for each fold
-            from sklearn.base import clone
-            model = clone(base_model)
-
-            if name == "SVR":
-                model.fit(X_tr_s, y_tr)
-                y_pred = model.predict(X_val_s)
-            elif name == "Linear Regression":
-                model.fit(X_tr, y_tr)
-                y_pred = model.predict(X_val)
-            else:
-                model.fit(X_tr, y_tr)
-                y_pred = model.predict(X_val)
-
-            fold_r2s.append(r2_score(y_val, y_pred))
-            fold_maes.append(mean_absolute_error(y_val, y_pred))
-            fold_rmses.append(rmse(y_val, y_pred))
-
+    for mname, mdata in fold_metrics.items():
+        r2_m = np.mean(mdata["r2"])
+        r2_s = np.std(mdata["r2"])
+        mae_m = np.mean(mdata["mae"])
+        rmse_m = np.mean(mdata["rmse"])
         cv_results.append({
-            "Model": name,
-            "CV MAE Mean": np.mean(fold_maes),
-            "CV RMSE Mean": np.mean(fold_rmses),
-            "CV R2 Mean": np.mean(fold_r2s),
-            "CV R2 Std": np.std(fold_r2s),
+            "Model": mname,
+            "CV MAE Mean": mae_m,
+            "CV RMSE Mean": rmse_m,
+            "CV R2 Mean": r2_m,
+            "CV R2 Std": r2_s,
         })
-        print(f"      {name:25s}  CV R2={np.mean(fold_r2s):.4f} +/- {np.std(fold_r2s):.4f}")
+        print(f"      {mname:28s}  CV R2={r2_m:.4f} +/- {r2_s:.4f}")
 
     cv_df = pd.DataFrame(cv_results).sort_values("CV R2 Mean", ascending=False)
     cv_df.to_csv(save_path("10_fold_cross_validation.csv"), index=False)
