@@ -726,10 +726,10 @@ Output  :   1 unit, Linear -> MPa
 
             if show_df is None:
                 data = {
-                    "Model":          ["XGBoost","Hybrid","Gradient Boosting","Random Forest","SVR","ANN","Linear Reg."],
-                    "MAE (MPa)":      [2.61,  3.09,  3.65,  3.51,  4.02,  4.30, 8.90],
-                    "RMSE (MPa)":     [4.20,  4.79,  5.02,  5.19,  5.97,  6.10,11.19],
-                    "R²":             [0.941, 0.923, 0.915, 0.910, 0.880, 0.875, 0.580],
+                    "Model":          ["Hybrid XGBoost + ANN", "XGBoost", "Gradient Boosting", "Artificial Neural Network", "Random Forest", "SVR", "Linear Regression"],
+                    "MAE (MPa)":      [3.35, 3.19, 4.10, 4.11, 4.03, 5.26, 7.75],
+                    "RMSE (MPa)":     [4.82, 4.87, 5.54, 5.57, 5.57, 7.15, 9.80],
+                    "R²":             [0.910, 0.908, 0.881, 0.880, 0.880, 0.802, 0.628],
                 }
                 show_df = pd.DataFrame(data)
 
