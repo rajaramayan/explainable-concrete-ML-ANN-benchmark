@@ -426,12 +426,25 @@ def page_models():
         </div>""", unsafe_allow_html=True)
 
         k1,k2,k3,k4 = st.columns(4)
-        for col, lbl, val, sub in [
-            (k1,"Best R²","0.941","XGBoost"),
-            (k2,"Lowest MAE","2.61 MPa","XGBoost"),
-            (k3,"Lowest RMSE","4.20 MPa","XGBoost"),
-            (k4,"Hybrid R²","0.923","XGBoost + ANN"),
-        ]:
+        comp_pre = datasets.get("comparison", pd.DataFrame())
+        if not comp_pre.empty:
+            _best     = comp_pre.loc[comp_pre["R2"].idxmax()]
+            _low_mae  = comp_pre.loc[comp_pre["MAE"].idxmin()]
+            _low_rmse = comp_pre.loc[comp_pre["RMSE"].idxmin()]
+            _hybrid   = comp_pre[comp_pre["Model"].str.contains("Hybrid", case=False)]
+            _hyb_r2   = f"{_hybrid['R2'].values[0]:.3f}" if not _hybrid.empty else "N/A"
+            _cards = [
+                (k1, "Best R²",    f"{_best['R2']:.3f}",         _best['Model']),
+                (k2, "Lowest MAE", f"{_low_mae['MAE']:.2f} MPa", _low_mae['Model']),
+                (k3, "Lowest RMSE",f"{_low_rmse['RMSE']:.2f} MPa",_low_rmse['Model']),
+                (k4, "Hybrid R²",  _hyb_r2,                       "XGBoost + ANN"),
+            ]
+        else:
+            _cards = [
+                (k1,"Best R²","N/A","—"),(k2,"Lowest MAE","N/A","—"),
+                (k3,"Lowest RMSE","N/A","—"),(k4,"Hybrid R²","N/A","—"),
+            ]
+        for col, lbl, val, sub in _cards:
             col.markdown(f"""<div class="mcard">
               <div class="mlbl">{lbl}</div><div class="mval">{val}</div>
               <div style="color:#94a3b8;font-size:.78rem;">{sub}</div>
